@@ -1,0 +1,128 @@
+param(
+    [Parameter(Mandatory)][string]$Deck,
+    [Parameter(Mandatory)][string]$Run,
+    [Parameter(Mandatory)][string]$Output,
+    [string]$Python = 'python',
+    [double]$MaxFont = 44,
+    [double]$MaxShiftPx = 200
+)
+
+$ErrorActionPreference = 'Stop'
+if (-not (Test-Path -LiteralPath $Deck)) { throw "Deck not found: $Deck" }
+if (-not (Test-Path -LiteralPath $Run)) { throw "Run not found: $Run" }
+if ([IO.Path]::GetFullPath($Deck) -eq [IO.Path]::GetFullPath($Output)) { throw 'Output must differ from input' }
+if (Test-Path -LiteralPath $Output) { throw "Output already exists: $Output" }
+$measure = Join-Path $PSScriptRoot 'measure_math_geometry.py'
+if (-not (Test-Path -LiteralPath $measure)) { throw "Missing helper: $measure" }
+$work = Join-Path $Run ('math_calibration_' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+New-Item -ItemType Directory -Path $work -ErrorAction Stop | Out-Null
+$app = New-Object -ComObject PowerPoint.Application
+$presentation = $null
+
+function Export-FormulaOnly([string]$Phase) {
+    $folder = Join-Path $work $Phase
+    New-Item -ItemType Directory -Path $folder -ErrorAction Stop | Out-Null
+    for ($page = 1; $page -le $presentation.Slides.Count; $page++) {
+        $manifest = Get-Content -LiteralPath (Join-Path $Run ('pages\page_{0:D3}\manifest.json' -f $page)) -Raw -Encoding utf8 | ConvertFrom-Json
+        $ids = New-Object 'System.Collections.Generic.HashSet[string]'
+        foreach ($formula in $manifest.formula_inventory) { [void]$ids.Add([string]$formula.id) }
+        $slide = $presentation.Slides.Item($page)
+        $hidden = New-Object 'System.Collections.Generic.List[object]'
+        try {
+            foreach ($shape in $slide.Shapes) {
+                if ($ids.Contains([string]$shape.Name)) { continue }
+                $hidden.Add(@($shape, $shape.Visible))
+                $shape.Visible = 0
+            }
+            $slide.Export((Join-Path $folder ('page_{0:D3}.png' -f $page)), 'PNG', [int]$manifest.source.width_px, [int]$manifest.source.height_px)
+        } finally {
+            foreach ($entry in $hidden) { $entry[0].Visible = $entry[1] }
+        }
+        if ($page % 10 -eq 0) { Write-Host "$Phase rendered $page/$($presentation.Slides.Count)" }
+    }
+    $json = Join-Path $work ($Phase + '.json')
+    & $Python $measure --run $Run --renders $folder --output $json | Out-Host
+    if ($LASTEXITCODE -ne 0) { throw "Geometry measurement failed: $Phase" }
+    foreach ($entry in (Get-Content -LiteralPath $json -Raw -Encoding utf8 | ConvertFrom-Json)) { Write-Output $entry }
+}
+
+try {
+    $presentation = $app.Presentations.Open($Deck, $false, $false, $false)
+    $scaled = 0
+    $shifted = 0
+    $targeted = New-Object 'System.Collections.Generic.HashSet[string]'
+    $warnings = New-Object 'System.Collections.Generic.List[string]'
+    $sourceJson = Join-Path $work 'source.json'
+    & $Python $measure --run $Run --output $sourceJson | Out-Host
+    if ($LASTEXITCODE -ne 0) { throw 'Source geometry measurement failed' }
+    foreach ($row in (Get-Content -LiteralPath $sourceJson -Raw -Encoding utf8 | ConvertFrom-Json)) {
+        $tex = [string]$row.latex
+        $operator = $tex.Contains('\sum') -or $tex.Contains('\int') -or $tex.Contains('\prod')
+        $wideDisplay = [int]$row.box_px[2] -ge 800 -and [int]$row.box_px[3] -ge 90 -and -not $tex.Contains('\frac')
+        if ($tex.Contains('\frac') -or $tex.Contains('\dfrac') -or $tex.Contains('\tfrac')) { continue }
+        if (-not ($operator -or $wideDisplay)) { continue }
+        [void]$targeted.Add("$($row.page)/$($row.id)")
+        if (-not $row.source_ink) {
+            $warnings.Add("$($row.page)/$($row.id): no source ink in formula box")
+            continue
+        }
+        $w = [int]$row.box_px[2]; $h = [int]$row.box_px[3]
+        $touchesEdge = [int]$row.source_ink[0] -le 2 -or [int]$row.source_ink[1] -le 2 -or [int]$row.source_ink[2] -ge $w - 2 -or [int]$row.source_ink[3] -ge $h - 2
+        $inkWidth = [int]$row.source_ink[2] - [int]$row.source_ink[0]
+        $inkHeight = [int]$row.source_ink[3] - [int]$row.source_ink[1]
+        if ($touchesEdge -and ($inkWidth -lt $w * 0.55 -or $inkHeight -lt $h * 0.55)) {
+            $warnings.Add("$($row.page)/$($row.id): source crop clips formula ink")
+            continue
+        }
+        $shape = $presentation.Slides.Item([int]$row.page).Shapes.Item([string]$row.id)
+        $range = $shape.TextFrame2.TextRange
+        $pxPerPointX = [double]$row.source_size_px[0] / [double]$presentation.PageSetup.SlideWidth
+        $pxPerPointY = [double]$row.source_size_px[1] / [double]$presentation.PageSetup.SlideHeight
+        $sourceWidth = [double]($row.source_ink[2] - $row.source_ink[0])
+        # Office's BoundWidth includes approximately 6 pt of text-frame padding.
+        $visibleWidth = [Math]::Max(1, ([double]$range.BoundWidth - 6.0) * $pxPerPointX)
+        $ratio = $sourceWidth / $visibleWidth
+        if ($ratio -lt 0.65 -or $ratio -gt 3.2) {
+            $warnings.Add("$($row.page)/$($row.id): implausible width ratio $ratio")
+            continue
+        }
+        $oldSize = [double]$range.Font.Size
+        $newSize = [Math]::Round([Math]::Min($MaxFont, [Math]::Max(8, $oldSize * $ratio)) * 2) / 2
+        if ([Math]::Abs($newSize - $oldSize) -ge 0.25) {
+            $range.Font.Size = $newSize
+            $scaled++
+        }
+        $sourceCenterX = [double]$row.box_px[0] + ([double]$row.source_ink[0] + [double]$row.source_ink[2]) / 2
+        $sourceCenterY = [double]$row.box_px[1] + ([double]$row.source_ink[1] + [double]$row.source_ink[3]) / 2
+        $inkCenterX = ([double]$range.BoundLeft + ([double]$range.BoundWidth - 6.0) / 2) * $pxPerPointX
+        $inkCenterY = ([double]$range.BoundTop + [double]$range.BoundHeight / 2 + 1.6) * $pxPerPointY
+        $dx = $sourceCenterX - $inkCenterX
+        $dy = $sourceCenterY - $inkCenterY
+        if ([Math]::Abs($dx) -gt $MaxShiftPx -or [Math]::Abs($dy) -gt $MaxShiftPx) {
+            $warnings.Add("$($row.page)/$($row.id): shift exceeds $MaxShiftPx px ($dx,$dy)")
+            continue
+        }
+        $newLeft = [double]$shape.Left + $dx / $pxPerPointX
+        $newTop = [double]$shape.Top + $dy / $pxPerPointY
+        # Math ink can be inside the page even when its large text frame extends past an edge.
+        $shape.Left = $newLeft
+        $shape.Top = $newTop
+        if ([Math]::Abs($dx) -ge 1 -or [Math]::Abs($dy) -ge 1) { $shifted++ }
+    }
+    $presentation.SaveAs($Output, 24)
+    $final = Export-FormulaOnly 'final'
+    $outliers = @($final | Where-Object {
+        $targeted.Contains("$($_.page)/$($_.id)") -and (
+        -not $_.source_ink -or -not $_.rendered_ink -or
+        [Math]::Abs([double]$_.dx_px) -gt 15 -or [Math]::Abs([double]$_.dy_px) -gt 15 -or
+        [double]$_.width_ratio -lt 0.8 -or [double]$_.width_ratio -gt 1.25
+        )
+    })
+    $report = [ordered]@{ input=$Deck; output=$Output; scaled=$scaled; shifted=$shifted; equations=$final.Count; targeted=$targeted.Count; outliers=$outliers.Count; warnings=$warnings.ToArray(); outlier_formulas=$outliers }
+    $reportPath = Join-Path $work 'report.json'
+    $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $reportPath -Encoding utf8
+    'equations={0} targeted={1} scaled={2} shifted={3} outliers={4} warnings={5} report={6}' -f $final.Count, $targeted.Count, $scaled, $shifted, $outliers.Count, $warnings.Count, $reportPath
+} finally {
+    if ($presentation -ne $null) { $presentation.Close() }
+    $app.Quit()
+}

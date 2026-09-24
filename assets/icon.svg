@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">PPT Rebuild</title>
+  <desc id="desc">Two layered slides with an editable sigma formula</desc>
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="#17365D"/>
+  <rect x="39" y="51" width="173" height="111" rx="16" fill="none" stroke="#B8D5FC" stroke-width="9" opacity=".52"/>
+  <rect x="51" y="72" width="169" height="121" rx="17" fill="#FFFFFF"/>
+  <path d="M167 104H88l54 28-54 31h79" fill="none" stroke="#163E70" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="75" y="90" width="106" height="86" rx="6" fill="none" stroke="#19BEB6" stroke-width="3" stroke-dasharray="7 7"/>
+  <circle cx="75" cy="90" r="5" fill="#19BEB6"/>
+  <circle cx="181" cy="90" r="5" fill="#19BEB6"/>
+  <circle cx="75" cy="176" r="5" fill="#19BEB6"/>
+  <circle cx="181" cy="176" r="5" fill="#19BEB6"/>
+</svg>

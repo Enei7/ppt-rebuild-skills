@@ -1,0 +1,46 @@
+# Reconstruction and QA recipe
+
+Read this when starting a PDF run, writing formula inventories, or auditing a final deck. This skill bundles the `editppt` CLI and its manifest schema; use the bundled runtime instead of inventing run-state files.
+
+## Source-page inspection
+
+For every page, capture source page number, pixel dimensions, legible text, formula regions, and foreground figures. Render/crop at sufficient resolution to read small symbols and QR modules. Prefer extraction of an embedded PDF image when it is the exact visual; otherwise crop the original PDF page rendering. Keep the crop file plus PDF page number and crop rectangle. Check the crop's pixels against the source before using it. A source crop is a selectable bitmap, not an editable drawing.
+
+Do not convert a whole page or major content block into a single image merely because the source is complex. Text, simple layout geometry, and tables stay native under the page decision tree. A user-requested exact QR/logo/hand-drawn diagram is a narrow exception to the generated-asset default: mark its manifest asset provenance as `user-provided`, set `exact_source_crop: true`, `source_page`, and `source_crop_px`, point `source` at the page's `source.png` (or another existing file from which the crop was made), and explain the crop in `provenance_note`. Keep positioned `images[].box_px` and the source-pixel coordinate system required by the manifest schema. The bundled validator accepts this documented exception; if evidence is missing, fix it rather than forging validation or silently substituting a generated figure.
+
+## Formula inventory contract
+
+For each standalone mathematical expression, create a unique per-page id and a source-pixel box. Preserve exact variables, indices, matrices, delimiters, and display alignment in its LaTeX source. A sample inventory entry follows; adapt its `image` path to the actual intermediate formula object.
+
+```json
+{
+  "id": "formula_03",
+  "box_px": [118, 264, 430, 78],
+  "tex_source": "assets/formula_03.tex",
+  "image": "assets/formula_03.svg",
+  "decision": "latex-rendered-image",
+  "editable": false
+}
+```
+
+The page-stage image is temporary and must be recorded honestly as non-editable. After `editppt run finalize`, `equationize.py` reads the inventory, transforms LaTeX → MathML → Office Math via `MML2OMML.XSL`, and replaces the picture or a uniquely named candidate with a native equation at the manifest box. `editable: false` describes the page-stage asset; the delivered PPTX's native equations are verified separately. If an expression was not converted, report it as non-editable. Do not fake a formula with Unicode superscript fragments or an invisible equation over a visible picture.
+
+Inline expressions may stay in editable body text when that is both legible and within the user's editability requirement. If the user asks that **every** expression open in the equation editor, inventory and convert inline expressions too, then recalibrate their baselines and boxes individually. Transcribe the source's *math layout*, not just its value: `1/(z-z_0)` is a linear inline expression, whereas `\frac{1}{z-z_0}` becomes a stacked fraction that may overflow a prose line. Keep parentheses around the denominator when using a slash.
+
+## Font and geometry
+
+Use Microsoft YaHei for ordinary visible text, including explicit run fonts, end-paragraph properties, and theme aliases where applicable. Do not force the equation math run to YaHei; Office math glyphs use a math font, normally Cambria Math. Match **visible glyph bounds and line baseline**, not just nominal point sizes. A `16 pt` Office summation can look less than half the height of its PDF counterpart. For each page, prefer source text boxes and `text_hints` as a starting point, then inspect the rendered slide. Small OCR noise does not justify changing a clearly visible word or formula.
+
+Run `calibrate_math_geometry.ps1` after equation conversion, using a fresh output file. It measures equation ink in the original `source.png` and PowerPoint-rendered formula-only slides, adjusts nary/wide-display equations from Office `BoundLeft/Top/Width/Height`, and writes a report under the run directory. A source crop touching an edge is not automatically invalid; a partial glyph with too little ink is. Do not blindly scale every inline formula: stacked Office fractions may need a different LaTeX structure when the source uses compact linear notation, and split text/formula boxes may have inaccurate source bounds. Inspect report warnings/outliers, then compare full-slide renders for collisions and baselines. Run `check_formula_text_spacing.ps1 -ReportTightGaps -ReportBaseline` on the actual final candidate; its ≥4 pt single-line overlaps are blockers, near-zero word junctions and >5 pt compact-inline center differences need visual review. Repair adjacent text and formula objects together so that widening a gap does not create a collision with the next run. A bounded vertical correction is reasonable only after checking the rendered line; nary operators and fractions have inherently taller ink and must not be centered like letters. Rerender and run the checker with `-FailOnCollision -ReportBaseline` after repairs. Preserve the native equation object; do not hide a source bitmap over it. Legacy `normalize_math_font.ps1`/`check_math_font.ps1` are useful only when no source crop is available; their mean-point-size rule is not a valid acceptance threshold after source-geometry calibration.
+
+## Validation and recovery
+
+Before equation conversion, require every page `validation.json` to have top-level `passed: true`, then `editppt run record` and `editppt run finalize`. Keep its output unchanged as the recovery deck. Run equation conversion and source-geometry calibration to separate output paths. The later passes mutate only copies of the finalized PPTX; running `editppt run finalize` again would replace them with the base output. Run `equationize.py --audit-existing` on the **actual final file after its last save**; its empty-nary gate must pass before delivery. If PowerPoint COM is unavailable, run that same structural audit and explicitly report the missing visual-baseline calibration.
+
+Audit the final file on three levels:
+
+1. **Structure:** valid/openable PPTX, correct page count/order, expected native `m:oMath` count, zero empty `m:nary/m:e` bodies (sum/integral dotted placeholders), all exact source assets present, and no full-page source raster duplicated under editable overlays.
+2. **Typography/geometry:** YaHei body text, source-visible formula size/position, no clipped or occluded text, and no major baseline or line-wrap drift. Inspect every formula sharing a line with prose, including 1–2 pt gaps that render as words glued to math; a formula-only render cannot expose collisions.
+3. **Visual fidelity:** render all slides and compare each against its PDF page; inspect QR scanability, crop edges, diagrams, tables, symbols, superscripts/subscripts, and layout. Specifically inspect slides with summations/integrals for dotted empty boxes. Verify one representative native formula in PowerPoint's equation editor.
+
+For a failed formula: inspect the source PDF crop and LaTeX, correct the inventory entry, rerun equation conversion from the unchanged finalized deck, and recalibrate. For a failed page object: repair its page-owned manifest/assets, rebuild/validate/record that page through `editppt`, re-finalize, then rerun post-processing. Do not repeat an unchanged failing command. If a library, Office stylesheet, PowerPoint COM, worker, or source detail is genuinely unavailable, preserve successful artifacts and report the limitation rather than calling the deck finished.
