@@ -48,7 +48,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check_formula_text
 python .\scripts\equationize.py --audit-existing --input <calibrated.pptx>
 ```
 
-Use a compatible `MML2OMML.XSL` with `--mml2omml <path>` if not auto-detected. The process-scoped PowerShell execution-policy flag changes no machine policy; inspect scripts before running them. Geometry calibration uses source crops and PowerPoint-rendered math ink, not a blanket point-size rule. It intentionally leaves ambiguous/compact inline formulas for visual review. After the **last** PowerPoint save, repeat `--audit-existing` on the actual delivered file. If PowerPoint COM is unavailable, run the structural audit and explicitly disclose that visual baseline calibration was not performed; do not present it as fully verified.
+Use a compatible `MML2OMML.XSL` with `--mml2omml <path>` if not auto-detected. The process-scoped PowerShell execution-policy flag changes no machine policy; inspect scripts before running them. Geometry calibration first fits oversized native equations, including fractions, inside their source boxes, then calibrates n-ary/wide math against source ink; it is not a blanket point-size rule. Ambiguous compact inline formulas still need visual review. After the **last** PowerPoint save, repeat `--audit-existing` on the actual delivered file. If PowerPoint COM is unavailable, run the structural audit and explicitly disclose that visual baseline calibration was not performed; do not present it as fully verified.
 
 ## Acceptance and recovery
 

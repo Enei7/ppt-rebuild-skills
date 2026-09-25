@@ -55,7 +55,34 @@ try {
     $sourceJson = Join-Path $work 'source.json'
     & $Python $measure --run $Run --output $sourceJson | Out-Host
     if ($LASTEXITCODE -ne 0) { throw 'Source geometry measurement failed' }
-    foreach ($row in (Get-Content -LiteralPath $sourceJson -Raw -Encoding utf8 | ConvertFrom-Json)) {
+    $sourceRows = @(Get-Content -LiteralPath $sourceJson -Raw -Encoding utf8 | ConvertFrom-Json)
+    $fitted = New-Object 'System.Collections.Generic.HashSet[string]'
+    foreach ($row in $sourceRows) {
+        $key = "$($row.page)/$($row.id)"
+        $shape = $presentation.Slides.Item([int]$row.page).Shapes.Item([string]$row.id)
+        $range = $shape.TextFrame2.TextRange
+        $pxPerPointX = [double]$row.source_size_px[0] / [double]$presentation.PageSetup.SlideWidth
+        $pxPerPointY = [double]$row.source_size_px[1] / [double]$presentation.PageSetup.SlideHeight
+        $boundWidth = [double]$range.BoundWidth * $pxPerPointX
+        $boundHeight = [double]$range.BoundHeight * $pxPerPointY
+        if ($boundWidth -le 0 -or $boundHeight -le 0) { $warnings.Add("${key}: empty native equation bounds"); continue }
+        $ratio = [Math]::Min(1.0, [Math]::Min([double]$row.box_px[2] / $boundWidth, [double]$row.box_px[3] / $boundHeight))
+        if ($ratio -ge 0.95) { continue }
+        [void]$fitted.Add($key)
+        [void]$targeted.Add($key)
+        $oldSize = [double]$range.Font.Size
+        $range.Font.Size = [Math]::Round([Math]::Max(8, $oldSize * $ratio) * 2) / 2
+        if ($range.Font.Size -lt $oldSize) { $scaled++ }
+        $sourceCenterX = ([double]$row.box_px[0] + [double]$row.box_px[2] / 2) / $pxPerPointX
+        $sourceCenterY = ([double]$row.box_px[1] + [double]$row.box_px[3] / 2) / $pxPerPointY
+        $dx = $sourceCenterX - ([double]$range.BoundLeft + [double]$range.BoundWidth / 2)
+        $dy = $sourceCenterY - ([double]$range.BoundTop + [double]$range.BoundHeight / 2)
+        $shape.Left = [double]$shape.Left + $dx
+        $shape.Top = [double]$shape.Top + $dy
+        if ([Math]::Abs($dx * $pxPerPointX) -ge 1 -or [Math]::Abs($dy * $pxPerPointY) -ge 1) { $shifted++ }
+    }
+    foreach ($row in $sourceRows) {
+        if ($fitted.Contains("$($row.page)/$($row.id)")) { continue }
         $tex = [string]$row.latex
         $operator = $tex.Contains('\sum') -or $tex.Contains('\int') -or $tex.Contains('\prod')
         $wideDisplay = [int]$row.box_px[2] -ge 800 -and [int]$row.box_px[3] -ge 90 -and -not $tex.Contains('\frac')
