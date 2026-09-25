@@ -35,6 +35,7 @@ The user may choose offline processing. Respect that choice: do not upload sourc
 ## Native formulas, fonts, and alignment
 
 - Transcribe LaTeX from the visible source; OCR hints do not prove symbols, indices, matrices, or delimiters. Every standalone formula, and every inline formula the user requires in the equation editor, needs a unique `formula_inventory` id, accurate source `box_px`, and `latex` or `tex_source`. Reference the temporary image with `image`/`replace_image_id` so conversion replaces it rather than overlaying it.
+- If no local TeX renderer is available, use an **exact, formula-only source crop** as a temporary page-stage image. Record truthful `user-provided` provenance with `source: source.png`, `exact_source_crop: true`, one-based `source_page`, and `source_crop_px`; keep the verified LaTeX and image reference in `formula_inventory`. This fallback is only for building the intermediate deck: native equation conversion and the final image-replacement audit remain mandatory.
 - Use Microsoft YaHei for editable ordinary text when requested. Office equations normally render with Cambria Math. Match their **visible glyph height, width, and baseline** to the nearby source text; matching nominal point size alone is insufficient. Preserve compact inline `1/(z-z_0)` when the source is linear; do not turn it into a tall stacked fraction merely for semantic equivalence.
 - Convert **a copy** of the finalized deck. On Windows with PowerPoint installed, run:
 

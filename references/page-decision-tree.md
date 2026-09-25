@@ -187,7 +187,7 @@ editppt formula render-latex <page_dir> \
   --fragment assets/formula_c2_1.fragment.json
 ```
 
-Merge the fragment's `images`, `asset_provenance`, and `formula_inventory` into `manifest.json`; the required provenance fields are in `manifest-schema.md`. Never assemble formulas from Unicode subscripts/superscripts or many hand-written text boxes, and never use source-image formula snippets.
+Merge the fragment's `images`, `asset_provenance`, and `formula_inventory` into `manifest.json`; the required provenance fields are in `manifest-schema.md`. Never assemble formulas from Unicode subscripts/superscripts or many hand-written text boxes. If the local TeX renderer is unavailable, a formula-only crop from `source.png` may stand in for the temporary page-stage image, with `user-provided` exact-source-crop provenance and the same complete LaTeX inventory. The final deck must replace the crop with native Office Math; a picture-only formula is a failure, not a warning.
 
 The rendered asset is temporary. Preserve `formula_inventory` with source LaTeX and `box_px`; after deck finalization, replace every required formula with native Office Math and audit the delivered file. If the TeX renderer or native conversion fails for a required formula, record the formula id and error, then repair it; do not label a picture-only fallback as a finished editable formula or replace it with a full-page screenshot.
 
