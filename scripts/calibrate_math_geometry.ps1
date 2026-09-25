@@ -55,7 +55,7 @@ try {
     $sourceJson = Join-Path $work 'source.json'
     & $Python $measure --run $Run --output $sourceJson | Out-Host
     if ($LASTEXITCODE -ne 0) { throw 'Source geometry measurement failed' }
-    $sourceRows = @(Get-Content -LiteralPath $sourceJson -Raw -Encoding utf8 | ConvertFrom-Json)
+    $sourceRows = Get-Content -LiteralPath $sourceJson -Raw -Encoding utf8 | ConvertFrom-Json
     $fitted = New-Object 'System.Collections.Generic.HashSet[string]'
     foreach ($row in $sourceRows) {
         $key = "$($row.page)/$($row.id)"
@@ -71,7 +71,7 @@ try {
         [void]$fitted.Add($key)
         [void]$targeted.Add($key)
         $oldSize = [double]$range.Font.Size
-        $range.Font.Size = [Math]::Round([Math]::Max(8, $oldSize * $ratio) * 2) / 2
+        $range.Font.Size = [double]([Math]::Round([Math]::Max(8, $oldSize * $ratio) * 2) / 2)
         if ($range.Font.Size -lt $oldSize) { $scaled++ }
         $sourceCenterX = ([double]$row.box_px[0] + [double]$row.box_px[2] / 2) / $pxPerPointX
         $sourceCenterY = ([double]$row.box_px[1] + [double]$row.box_px[3] / 2) / $pxPerPointY
@@ -116,7 +116,7 @@ try {
         $oldSize = [double]$range.Font.Size
         $newSize = [Math]::Round([Math]::Min($MaxFont, [Math]::Max(8, $oldSize * $ratio)) * 2) / 2
         if ([Math]::Abs($newSize - $oldSize) -ge 0.25) {
-            $range.Font.Size = $newSize
+            try { $range.Font.Size = [double]$newSize } catch { throw "Cannot size $($row.page)/$($row.id) from $oldSize to $newSize (ratio $ratio): $($_.Exception.Message)" }
             $scaled++
         }
         $sourceCenterX = [double]$row.box_px[0] + ([double]$row.source_ink[0] + [double]$row.source_ink[2]) / 2
@@ -149,6 +149,9 @@ try {
     $reportPath = Join-Path $work 'report.json'
     $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $reportPath -Encoding utf8
     'equations={0} targeted={1} scaled={2} shifted={3} outliers={4} warnings={5} report={6}' -f $final.Count, $targeted.Count, $scaled, $shifted, $outliers.Count, $warnings.Count, $reportPath
+} catch {
+    Write-Error ("Calibration failed at line {0}, page {1}, formula {2}: {3}" -f $_.InvocationInfo.ScriptLineNumber, $row.page, $row.id, $_.Exception.Message)
+    throw
 } finally {
     if ($presentation -ne $null) { $presentation.Close() }
     $app.Quit()

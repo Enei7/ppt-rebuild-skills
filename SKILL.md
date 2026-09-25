@@ -59,6 +59,8 @@ Render and compare **every** output slide with its source PDF page. Inspect ever
 
 The final `.pptx` must open, match source page count/order, pass page/final runtime validation, contain the expected native formulas with **zero empty `m:nary/m:e` bodies or dotted placeholder squares**, and have no full-page source raster overlay. Open at least one formula in PowerPoint's equation editor. If a required formula remains an image, the deck is not a completed editable-formula delivery. Repair its source LaTeX/inventory and rerun from the preserved pre-equation deck; do not overwrite the PDF or successful intermediates. Report final file path, page/formula counts, QA result, non-editable image classes, and unresolved limitations.
 
+When post-finalization QA finds a page defect, repair that page's manifest/assets, rebuild and validate it, then call `run record` again with the same page-owner agent id. This refreshes an accepted page's hashes and reopens the run for `run finalize`; do not hand-edit `page_jobs.json`. Keep the previous native/calibrated files as recovery and write each new conversion to a fresh path.
+
 ## Bundled resources
 
 - `cli/`: bundled `editppt` runtime and Python package; install it from this skill folder.

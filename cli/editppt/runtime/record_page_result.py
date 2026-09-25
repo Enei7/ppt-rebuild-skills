@@ -76,7 +76,7 @@ def main():
             )
         execution_mode = dispatch.get("execution_mode") or "worker"
         record_mode = "local-main-agent" if execution_mode == "local" else "dispatched-worker"
-    elif page.get("status") == "recorded":
+    elif page.get("status") in {"recorded", "accepted"}:
         previous = page.get("result") or {}
         if previous.get("agent_id") != args.agent_id:
             raise SystemExit(
@@ -119,6 +119,8 @@ def main():
         "validation_passed": validation_passed,
     }
     page["status"] = "recorded"
+    page["accepted"] = False
+    page.pop("accepted_at", None)
     update_jobs_run_status(jobs)
     save_jobs(run_dir, jobs)
     if jobs.get("run_status") == "pages_recorded":
