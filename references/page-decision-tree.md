@@ -171,6 +171,7 @@ Use reliable measured font sizes and positions first; inspect the source to corr
 - Same-level text uses exactly one font size: lines sharing a `size_group` get the same size, hand-added text joins the size group of its level, and the final page keeps same-level text identical even where individual measurements disagree slightly.
 - Keep deterministic runtime fitting (`fit_text`) enabled as the overflow guard; tuning fields and when to disable it are in `manifest-schema.md`.
 - After building a preview, compare text by level against the source; do not enlarge titles, body text, or labels by default. If any level looks larger, heavier, more crowded, or wraps more than the source, fix the font size or box before continuing.
+- Rebuild ordinary prose as contiguous editable spans, not OCR-word-by-word boxes. Where an inline equation interrupts a sentence, split at that equation and leave measurable whitespace before and after its source box; verify the actual PowerPoint render because font metrics differ from the PDF.
 
 Record completed calibration with `quality_checks.font_size_calibrated=true`.
 
