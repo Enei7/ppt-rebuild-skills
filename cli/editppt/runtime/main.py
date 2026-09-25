@@ -127,11 +127,13 @@ def cmd_prepare(args: argparse.Namespace) -> int:
         print(prepared.stderr, end="", file=sys.stderr)
     if prepared.returncode != 0:
         return prepared.returncode
-    lines = [line.strip() for line in prepared.stdout.splitlines() if line.strip()]
-    if not lines:
+    deck_path = next(
+        (Path(line.strip()) for line in prepared.stdout.splitlines() if Path(line.strip()).name == "deck_manifest.json"),
+        None,
+    )
+    if deck_path is None:
         print("prepare did not report a deck_manifest.json path", file=sys.stderr)
         return 1
-    deck_path = Path(lines[0])
     if not deck_path.exists():
         print(f"prepare reported a missing deck_manifest.json path: {deck_path}", file=sys.stderr)
         return 1
