@@ -192,6 +192,8 @@ Merge the fragment's `images`, `asset_provenance`, and `formula_inventory` into 
 
 The rendered asset is temporary. Preserve `formula_inventory` with source LaTeX and `box_px`; after deck finalization, replace every required formula with native Office Math and audit the delivered file. If the TeX renderer or native conversion fails for a required formula, record the formula id and error, then repair it; do not label a picture-only fallback as a finished editable formula or replace it with a full-page screenshot.
 
+PowerPoint may reject a whole deck when a n-ary limit contains a multiline `\substack`/`\text` annotation. Keep the integral or sum as native math and position the multiline annotation as separate editable objects; verify the converted page actually opens in PowerPoint.
+
 ### 3.3 Structural Primitives and Layout Objects
 
 These may use native PPT shapes or structural objects:

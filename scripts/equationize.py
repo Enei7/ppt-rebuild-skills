@@ -103,6 +103,11 @@ def formula_shape(formula, xfrm, shape_id, transform):
     if omath is None:
         raise ValueError(f"MathML conversion produced no equation: {tex}")
     fill_empty_nary_bases(omath)
+    if omath.xpath(".//m:nary/m:sub/m:eqArr | .//m:nary/m:sup/m:eqArr", namespaces=NS):
+        raise ValueError(
+            f"{formula['id']}: multiline integral/sum limit is not PowerPoint-safe; "
+            "place its annotation in separate editable objects"
+        )
 
     shape = etree.Element(tag(P, "sp"), nsmap={"a14": A14, "m": M})
     nv = etree.SubElement(shape, tag(P, "nvSpPr"))
@@ -343,6 +348,12 @@ def self_check(mml2omml=None):
     for latex in (r"\sum_{k=1}^{\infty} u_k(z)", r"\int_C u_k(z)\,dz", r"\sum_0^\infty"):
         sample = formula_shape({"id": "nary-check", "latex": latex, "box_px": [0, 0, 100, 50]}, xfrm, 3, transform)
         assert sample.xpath("count(.//m:nary/m:e[not(*) and not(normalize-space())])", namespaces=NS) == 0
+    try:
+        formula_shape({"id": "unsafe-limit", "latex": r"\int_{\substack{a\\b}}x\,dx", "box_px": [0, 0, 100, 50]}, xfrm, 4, transform)
+    except ValueError as exc:
+        assert "not PowerPoint-safe" in str(exc)
+    else:
+        raise AssertionError("multiline n-ary limit must be rejected")
     print("self-check=ok")
 
 
