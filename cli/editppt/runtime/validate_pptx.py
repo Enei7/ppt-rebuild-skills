@@ -625,7 +625,7 @@ def validate_deck(args):
     if args.report:
         Path(args.report).parent.mkdir(parents=True, exist_ok=True)
         Path(args.report).write_text(output + "\n", encoding="utf-8")
-    print(output)
+    print(json.dumps(report, ensure_ascii=True, indent=2))
     raise SystemExit(0 if report["passed"] else 1)
 
 
@@ -878,7 +878,7 @@ def main():
     if args.report:
         Path(args.report).parent.mkdir(parents=True, exist_ok=True)
         Path(args.report).write_text(output + "\n", encoding="utf-8")
-    print(output)
+    print(json.dumps(report, ensure_ascii=True, indent=2))
     raise SystemExit(0 if report["passed"] else 1)
 
 
