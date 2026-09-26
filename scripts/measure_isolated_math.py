@@ -10,16 +10,54 @@ from PIL import Image
 from measure_math_geometry import ink_box
 
 
-def compare(source, rendered, box):
+SOURCE_INK_FILTERS = {"achromatic"}
+
+
+def validate_source_ink_filter(source_ink_filter):
+    if source_ink_filter is None:
+        return None
+    if (
+        not isinstance(source_ink_filter, str)
+        or source_ink_filter not in SOURCE_INK_FILTERS
+    ):
+        allowed = ", ".join(sorted(SOURCE_INK_FILTERS))
+        raise ValueError(
+            f"Invalid source_ink_filter {source_ink_filter!r}; expected one of: {allowed}"
+        )
+    return source_ink_filter
+
+
+def filter_source_ink(pixels, source_ink_filter=None):
+    source_ink_filter = validate_source_ink_filter(source_ink_filter)
+    if source_ink_filter is None:
+        return pixels
+    rgb = pixels[:, :, :3].astype(np.int16, copy=False)
+    chromatic = np.max(rgb, axis=2) - np.min(rgb, axis=2) > 60
+    filtered = pixels.copy()
+    filtered[chromatic, :3] = 255
+    return filtered
+
+
+def compare(source, rendered, box, source_ink_filter=None):
     if source.shape != rendered.shape:
         raise ValueError("Source and isolated render dimensions differ")
     x, y, width, height = map(int, box)
     if min(x, y) < 0 or min(width, height) <= 0 or x + width > source.shape[1] or y + height > source.shape[0]:
         raise ValueError(f"Invalid formula source box: {box}")
-    original = ink_box(source[y:y + height, x:x + width])
+    source_ink_filter = validate_source_ink_filter(source_ink_filter)
+    source_crop = filter_source_ink(
+        source[y:y + height, x:x + width], source_ink_filter
+    )
+    original = ink_box(source_crop)
     current = ink_box(rendered)
-    if original is None or current is None:
-        raise ValueError("Missing source or rendered formula ink")
+    if original is None:
+        suffix = (
+            f" after source_ink_filter={source_ink_filter!r}"
+            if source_ink_filter is not None else ""
+        )
+        raise ValueError(f"Missing source formula ink{suffix}")
+    if current is None:
+        raise ValueError("Missing rendered formula ink")
     original = [original[0] + x, original[1] + y, original[2] + x, original[3] + y]
     if current[0] == 0 or current[1] == 0 or current[2] == rendered.shape[1] or current[3] == rendered.shape[0]:
         raise ValueError("Native ink touches canvas edge; resolve clipping before measurement")
@@ -35,6 +73,9 @@ def measure(run, folder):
     targets = json.loads((folder / "targets.json").read_text(encoding="utf-8-sig"))
     result = []
     for index, target in enumerate(targets):
+        source_ink_filter = validate_source_ink_filter(
+            target.get("source_ink_filter")
+        )
         page = run / "pages" / f"page_{int(target['page']):03}"
         manifest = json.loads((page / "manifest.json").read_text(encoding="utf-8-sig"))
         matches = [f for f in manifest.get("formula_inventory", []) if f.get("id") == target["id"]]
@@ -42,7 +83,15 @@ def measure(run, folder):
             raise ValueError(f"Formula inventory id is not unique: {target}")
         source = np.asarray(Image.open(page / "source.png").convert("RGB"))
         rendered = np.asarray(Image.open(folder / f"formula_{index:04}.png").convert("RGB"))
-        result.append({**target, **compare(source, rendered, matches[0]["box_px"])})
+        result.append({
+            **target,
+            **compare(
+                source,
+                rendered,
+                matches[0]["box_px"],
+                source_ink_filter=source_ink_filter,
+            ),
+        })
     return result
 
 
