@@ -79,6 +79,15 @@ Audit the final file on three levels:
 2. **Typography/geometry:** YaHei body text, source-visible formula size/position, no clipped or occluded text, and no major baseline or line-wrap drift. Inspect every formula sharing a line with prose, including 1–2 pt gaps that render as words glued to math; a formula-only render cannot expose collisions.
 3. **Visual fidelity:** render all slides and compare each against its PDF page; inspect QR scanability, crop edges, diagrams, tables, symbols, superscripts/subscripts, and layout. Specifically inspect slides with summations/integrals for dotted empty boxes. Verify one representative native formula in PowerPoint's equation editor.
 
+Review annotation geometry against the final visible ink, not only manifest
+boxes: frame strokes must clear both the enclosed formulas and the neighboring
+outside row. Moving a frame away from one fraction can cut the preceding
+equation; moving a label away from a border can put it under an arrowhead. Check
+the whole affected region after each correction. If a diagram label collides
+with a reconstructed curve, compare the curve's landmarks with the source before
+repeatedly shifting correctly positioned text. A prose/formula spacing checker
+does not test curves, arrowheads, highlight rectangles, or container membership.
+
 Use `python <skill-root>/scripts/audit_deck.py --run <run> --deck <final.pptx> --report <new-report.json>` for the inventory gate. It checks formula IDs per presentation-order page, not only the aggregate equation count, and reconciles remaining pictures after formula replacement. A deck with zero equations can pass the standalone empty-nary check while still missing every required formula; the inventory gate rejects that case. A report path must be new to preserve earlier evidence.
 
 For multiple input decks, keep one run and one final file per input unless the user requests a combined deck. Preserve filenames with spaces when resolving inputs. Page authoring may run in parallel across independent runs, but serialize desktop PowerPoint operations: its shared COM application can otherwise mix selections or be closed by another worker. Track and validate each deck separately; a successful chapter does not imply the entire batch passed. Do not publish source PDFs or generated decks along with reusable skill changes unless specifically authorized.

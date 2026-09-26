@@ -63,6 +63,14 @@ measurements to repair source-supported line breaks or available spans together;
 do not blindly expand every limit to the slide edge. Choose a fresh output path
 for the next attempt so earlier failure evidence is retained.
 
+For a sentence inside a theorem panel, caption, table cell, or column, set
+`right_limit_px` to that container's usable edge, not the slide edge. A live-width
+pass can still put text outside its gray panel if the recipe supplied the wrong
+boundary. Keep display equations on their source rows; do not combine a display
+equation with the next prose sentence merely because both fit on one line.
+Recheck highlighter rectangles after prose reflow so they still mark the intended
+words rather than the previous coordinates.
+
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File <skill-root>/scripts/reflow_mixed_lines.ps1 `
   -Deck <native-input.pptx> -Run <run-dir> -Lines <recipe.json> `
