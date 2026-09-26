@@ -16,6 +16,10 @@ def ink_box(pixels):
     return [int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1]
 
 
+def native_formula(formula):
+    return isinstance(formula, dict) and not str(formula.get("decision", "")).startswith(("embedded-", "source-embedded-"))
+
+
 def measure(run, renders=None):
     rows = []
     for page_dir in sorted((run / "pages").glob("page_*")):
@@ -26,6 +30,8 @@ def measure(run, renders=None):
         if rendered is not None and source.shape != rendered.shape:
             raise ValueError(f"Page {page}: source/render size differs")
         for formula in manifest.get("formula_inventory", []):
+            if not native_formula(formula):
+                continue
             x, y, w, h = map(int, formula["box_px"])
             original = ink_box(source[y : y + h, x : x + w])
             current = None if rendered is None else ink_box(rendered[y : y + h, x : x + w])
@@ -48,6 +54,8 @@ def self_check():
     blank[7:18, 9:24] = 0
     assert ink_box(blank) == [9, 7, 24, 18]
     assert ink_box(np.full_like(blank, 255)) is None
+    assert native_formula({"decision": "source-exact-formula-crop"})
+    assert not native_formula({"decision": "embedded-editable-text-run"})
 
 
 if __name__ == "__main__":

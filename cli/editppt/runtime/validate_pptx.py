@@ -225,6 +225,8 @@ def page_contract_violations(manifest):
     violations = []
     slide = manifest.get("slide", {})
     images = manifest.get("images", [])
+    image_paths = {Path(image.get("path", "")).as_posix() for image in images}
+    image_ids = {image.get("id") for image in images}
     text_boxes = manifest.get("text_boxes", []) or manifest.get("tables", [])
     provenance_by_path = {
         Path(entry.get("path", "")).as_posix(): entry
@@ -255,6 +257,16 @@ def page_contract_violations(manifest):
                     "reason": "full-slide raster background cannot be assembled with editable text",
                 }
             )
+
+    for index, formula in enumerate(manifest.get("formula_inventory", [])):
+        if not isinstance(formula, dict) or str(formula.get("decision", "")).startswith(("embedded-", "source-embedded-")):
+            continue
+        path = formula.get("image")
+        if path and Path(path).as_posix() not in image_paths:
+            violations.append({"field": f"formula_inventory[{index}].image", "reason": "formula replacement image is not declared in images"})
+        replace_id = formula.get("replace_image_id")
+        if replace_id and replace_id not in image_ids:
+            violations.append({"field": f"formula_inventory[{index}].replace_image_id", "reason": "formula replacement image id is not declared in images"})
 
     return violations
 

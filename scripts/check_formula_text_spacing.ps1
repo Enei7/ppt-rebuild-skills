@@ -25,6 +25,7 @@ try {
         $formulaIds = New-Object 'System.Collections.Generic.HashSet[string]'
         $latexById = @{}
         foreach ($formula in $manifest.formula_inventory) {
+            if ([string]$formula.decision -match '^(embedded-|source-embedded-)') { continue }
             [void]$formulaIds.Add([string]$formula.id)
             $latexById[[string]$formula.id] = [string]$formula.latex
         }
