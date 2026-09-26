@@ -165,6 +165,26 @@ def test_runtime_omits_page_switch_when_pages_are_not_supplied():
     assert "foreach ($page in @($Pages))" not in script
 
 
+def test_all_overflowing_lines_are_reported(run, deck):
+    plan = validate_recipes(valid_recipe(), run, deck)
+    second = json.loads(json.dumps(plan['lines'][0]))
+    second['id'] = 'mixed-2'
+    plan['lines'].append(second)
+    measurements = [
+        {'id': name, 'items': [
+            {'shape': 'prose_a', 'width_px': 300},
+            {'shape': 'formula_x', 'width_px': 400},
+            {'shape': 'dup_second', 'width_px': 900}]}
+        for name in ('mixed-1', 'mixed-2')]
+    try:
+        validate_width_measurements(plan, measurements)
+    except RecipeError as exc:
+        assert "line 'mixed-1'" in str(exc)
+        assert "line 'mixed-2'" in str(exc)
+    else:
+        raise AssertionError('Every overflow must fail validation')
+
+
 def main():
     with tempfile.TemporaryDirectory() as temp_dir:
         run, deck = fixture(Path(temp_dir))
@@ -175,6 +195,7 @@ def main():
         test_repeated_page_shape_fails_after_selector_resolution(run, deck)
         test_exact_expected_is_case_and_whitespace_sensitive(run, deck)
         test_width_overflow_fails_without_resize(run, deck)
+        test_all_overflowing_lines_are_reported(run, deck)
         test_runtime_omits_page_switch_when_pages_are_not_supplied()
 
 

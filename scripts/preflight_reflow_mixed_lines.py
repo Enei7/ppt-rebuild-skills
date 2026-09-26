@@ -449,6 +449,7 @@ def validate_width_measurements(
         )
 
     results = []
+    overflow_errors = []
     for line in plan["lines"]:
         row = by_id[line["id"]]
         measured_items = row.get("items")
@@ -465,7 +466,7 @@ def validate_width_measurements(
             cursor += float(planned["gap_before_px"])
             right = cursor + width
             if right > float(line["right_limit_px"]) + tolerance_px:
-                raise RecipeError(
+                overflow_errors.append(
                     f"line {line['id']!r} overflows at {planned['shape']!r}: "
                     f"right={right:.3f}, limit={float(line['right_limit_px']):.3f}; no resize allowed"
                 )
@@ -474,6 +475,8 @@ def validate_width_measurements(
             )
             cursor = right
         results.append({"id": line["id"], "right_px": cursor, "items": item_results})
+    if overflow_errors:
+        raise RecipeError("\n".join(overflow_errors))
     return {"schema_version": 1, "status": "pass", "lines": results}
 
 

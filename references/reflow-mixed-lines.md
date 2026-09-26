@@ -56,6 +56,13 @@ the sentence. Revisit the source line break or intended span; do not reduce
 all font sizes until the error disappears. The original input is never saved
 over. `-Pages` can limit application to selected pages after recipe validation.
 
+The width check reports all overflowing lines in one pass. A failed live-width
+preflight preserves `<output>.preflight-plan.json` and
+`<output>.preflight-widths.json` without saving a changed deck. Use these exact
+measurements to repair source-supported line breaks or available spans together;
+do not blindly expand every limit to the slide edge. Choose a fresh output path
+for the next attempt so earlier failure evidence is retained.
+
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File <skill-root>/scripts/reflow_mixed_lines.ps1 `
   -Deck <native-input.pptx> -Run <run-dir> -Lines <recipe.json> `

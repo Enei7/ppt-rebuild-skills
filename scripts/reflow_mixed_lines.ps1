@@ -20,6 +20,11 @@ if (Test-Path -LiteralPath $Output) { throw 'Use a fresh output path' }
 if (-not $Report) { $Report = $Output + '.geometry.json' }
 $Report = [IO.Path]::GetFullPath($Report)
 if (Test-Path -LiteralPath $Report) { throw 'Use a fresh geometry report path' }
+$failedPlanPath = $Output + '.preflight-plan.json'
+$failedWidthsPath = $Output + '.preflight-widths.json'
+foreach ($evidence in @($failedPlanPath, $failedWidthsPath)) {
+    if (Test-Path -LiteralPath $evidence) { throw 'Use a fresh output path to preserve failed preflight evidence' }
+}
 
 $preflight = Join-Path $PSScriptRoot 'preflight_reflow_mixed_lines.py'
 if (-not (Test-Path -LiteralPath $preflight)) { throw "Missing preflight helper: $preflight" }
@@ -108,7 +113,12 @@ try {
 
     ConvertTo-Json -InputObject @($measurements.ToArray()) -Depth 8 | Set-Content -LiteralPath $measurementPath -Encoding utf8
     & $Python $preflight --plan $planPath --measurements $measurementPath | Out-Host
-    if ($LASTEXITCODE -ne 0) { throw 'Measured line widths overflow or differ from the validated plan; no shapes were moved' }
+    if ($LASTEXITCODE -ne 0) {
+        [IO.File]::Copy($planPath, $failedPlanPath, $false)
+        [IO.File]::Copy($measurementPath, $failedWidthsPath, $false)
+        Write-Host "Preflight evidence: $failedPlanPath ; $failedWidthsPath"
+        throw 'Measured line widths overflow or differ from the validated plan; no shapes were moved'
+    }
 
     foreach ($state in $states) {
         $line = $state.Plan
