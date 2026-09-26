@@ -10,6 +10,8 @@ Do not convert a whole page or major content block into a single image merely be
 
 ## Formula inventory contract
 
+For a diagram that contains formula labels, assign each label exactly one visible representation. If the label is rebuilt as native math, exclude its original pixels from the figure crop. Prefer an embedded unlabeled figure or clean source subcrops; for simple axes/arrows, rebuild the geometry natively. Do not leave the original label underneath a new equation, and do not hide it with a broad white rectangle that erases intersecting lines or curves. Inspect the complete diagram after conversion, including crop-edge axis labels and rotated annotations. A correct formula count cannot detect doubled labels or missing figure geometry.
+
 For each standalone mathematical expression, create a unique per-page id and a source-pixel box. Preserve exact variables, indices, matrices, delimiters, and display alignment in its LaTeX source. A sample inventory entry follows; adapt its `image` path to the actual intermediate formula object.
 
 Keep the source box formula-only, with modest padding. Do not include the next prose line to make the box taller: source-ink measurement will then calibrate to that unrelated line and can move an otherwise correct inline equation into the surrounding text. Check the crop itself, not just the page preview.
