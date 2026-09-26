@@ -155,6 +155,20 @@ def space_function_runs(root):
             parent.insert(parent.index(atom) + offset, gap)
 
 
+def normalize_overline_bars(root):
+    """Use a structural overbar, not a baseline horizontal-bar accent glyph."""
+    repaired = 0
+    for accent in root.xpath(".//m:acc[m:accPr/m:chr[@m:val='―']]", namespaces=NS):
+        accent.tag = tag(M, "bar")
+        props = accent.find(tag(M, "accPr"))
+        props.tag = tag(M, "barPr")
+        char = props.find(tag(M, "chr"))
+        char.tag = tag(M, "pos")
+        char.set(tag(M, "val"), "top")
+        repaired += 1
+    return repaired
+
+
 def formula_shape(formula, xfrm, shape_id, transform):
     tex = formula["latex"]
     # Bare integral tokens otherwise become small ordinary text in Office's XSL.
@@ -223,6 +237,7 @@ def formula_shape(formula, xfrm, shape_id, transform):
         omath = result.getroot()
     if omath is None:
         raise ValueError(f"MathML conversion produced no equation: {tex}")
+    normalize_overline_bars(omath)
     # Preserve text-style fractions as a smaller math argument, not a tall display.
     for fraction in list(omath.findall(f".//{tag(M, 'f')}")):
         levels = fraction.xpath("./m:num/m:argPr/m:scrLvl | ./m:den/m:argPr/m:scrLvl", namespaces=NS)

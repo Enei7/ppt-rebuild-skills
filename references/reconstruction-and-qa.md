@@ -41,6 +41,8 @@ Treat source-positioned math blocks as separate objects even if they share a row
 
 ## Font and geometry
 
+Overlines must remain above their operands. The Office stylesheet maps some `\overline` expressions to a horizontal-bar accent whose glyph crosses the letter (for example a barred V can look like a different symbol). The converter normalizes this case to a structural native top bar. Check accent placement in the PowerPoint render as well as the LaTeX; correct source transcription alone does not guarantee correct visual meaning.
+
 Preserve the source placement of operator limits. For a sum with bounds visibly above and below the symbol, transcribe `\sum\limits_{k=1}^{\infty}`; plain `\sum_{k=1}^{\infty}` currently converts to side limits. Do not rely on `\displaystyle`, which this converter strips. Keep side limits when the source uses them. Likewise, do not add parentheses around function arguments merely because the resulting expression is mathematically equivalent: extra symbols alter the source layout. Verify both decisions in the native Office render.
 
 For a uniformly colored formula, record `native_color_hex` (six hex digits, e.g. `FF0000`) in its inventory entry; temporary crop colors are not automatically inherited by Office Math. Mixed-color expressions need separately inventoried source blocks or explicit verified math-run styling.
