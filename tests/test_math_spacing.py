@@ -33,6 +33,12 @@ def main():
     ]
 
     transform = etree.XSLT(etree.parse(str(find_mml2omml())))
+    for command, expected in ((r"\sum", "subSup"), (r"\sum\limits", "undOvr")):
+        sample = formula_shape(
+            {"id": "limit-placement", "latex": command + r"_{k=1}^{\infty}x_k", "box_px": [0, 0, 300, 100]},
+            xfrm(), 2, transform,
+        )
+        assert sample.xpath("string(.//m:naryPr/m:limLoc/@m:val)", namespaces=NS) == expected
     spaced = formula_shape(
         {"id": "ordinary-spacing", "latex": r"0\,x\;y\quad\text{or}\qquad(D)", "box_px": [0, 0, 400, 60]},
         xfrm(), 2, transform,
