@@ -988,6 +988,7 @@ def render_preview(manifest, manifest_path, out_path):
 def choose_preview_font(preferred):
     candidates = [
         preferred,
+        "C:/Windows/Fonts/msyh.ttc",
         "/System/Library/Fonts/STHeiti Medium.ttc",
         "/System/Library/Fonts/STHeiti Light.ttc",
         "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
