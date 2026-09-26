@@ -137,6 +137,8 @@ try {
         if ([Math]::Abs($dx) -ge 1 -or [Math]::Abs($dy) -ge 1) { $shifted++ }
     }
     $presentation.SaveAs($Output, 24)
+    & $Python (Join-Path $PSScriptRoot 'equationize.py') --audit-existing --input $Output | Out-Host
+    if ($LASTEXITCODE -ne 0) { throw 'Saved PowerPoint failed native-equation/XML audit; do not deliver it' }
     $final = Export-FormulaOnly 'final'
     $outliers = @($final | Where-Object {
         $targeted.Contains("$($_.page)/$($_.id)") -and (

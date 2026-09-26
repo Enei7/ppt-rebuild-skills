@@ -28,6 +28,7 @@ NS = {"p": P, "a": A, "r": R, "m": M}
 EMU = 914400
 SLIDE_RE = re.compile(r"ppt/slides/slide(\d+)\.xml$")
 NARY_BOUNDARIES = {"=", "+", "-", "−", ",", ";", ")", "]", "<", ">", "≤", "≥"}
+FUNCTION_NAMES = {"sin", "cos", "tan", "cot", "sec", "csc", "sinh", "cosh", "tanh", "ln", "log", "exp", "arcsin", "arccos", "arctan", "arccot"}
 
 
 def tag(namespace, name):
@@ -82,8 +83,32 @@ def fill_empty_nary_bases(root):
     return repaired
 
 
+def space_function_runs(root):
+    """Office's MathML transform drops mspace, so keep function gaps in OMML."""
+    for run in list(root.findall(f".//{tag(M, 'r')}")):
+        if "".join(run.itertext()) not in FUNCTION_NAMES:
+            continue
+        atom = run
+        container = atom.getparent()
+        if container.tag == tag(M, "e") and len(container) == 1 and container.getparent().tag in {tag(M, "sSup"), tag(M, "sSub"), tag(M, "sSubSup")}:
+            atom = container.getparent()
+        parent = atom.getparent()
+        index = parent.index(atom)
+        for offset, neighbor in ((0, parent[index - 1] if index else None), (1, parent[index + 1] if index + 1 < len(parent) else None)):
+            if neighbor is None or neighbor.tag not in {tag(M, name) for name in ("r", "sSup", "sSub", "sSubSup", "f", "rad")}:
+                continue
+            text = "".join(neighbor.itertext())
+            if not text or not (text[-1].isalnum() if offset == 0 else text[0].isalnum()):
+                continue
+            gap = etree.Element(tag(M, "r"))
+            etree.SubElement(gap, tag(M, "t")).text = "\u2009"
+            parent.insert(parent.index(atom) + offset, gap)
+
+
 def formula_shape(formula, xfrm, shape_id, transform):
     tex = formula["latex"]
+    # Bare integral tokens otherwise become small ordinary text in Office's XSL.
+    tex = re.sub(r"\\int(?![A-Za-z]|\s*[_^]|\\limits)", r"\\int_{}^{}", tex)
     for style in (r"\displaystyle", r"\textstyle", r"\scriptstyle", r"\scriptscriptstyle"):
         tex = tex.replace(style, "")
     if r"\begin{aligned}" in tex:
@@ -96,13 +121,67 @@ def formula_shape(formula, xfrm, shape_id, transform):
     unknown = [node.text for node in mathml.iter() if node.text and node.text.startswith("\\")]
     if unknown:
         raise ValueError(f"Unconverted LaTeX command in {formula['id']}: {unknown}")
+    # The Office stylesheet understands mfenced, but loses stretchy mo fences.
+    mathml_ns = "http://www.w3.org/1998/Math/MathML"
+    for node in mathml.iter():
+        if node.text in FUNCTION_NAMES and node.tag in {tag(mathml_ns, "mi"), tag(mathml_ns, "mo")}:
+            node.tag = tag(mathml_ns, "mi")
+            node.set("mathvariant", "normal")
+    for row in reversed(list(mathml.iter(tag(mathml_ns, "mrow")))):
+        children = list(row)
+        if len(children) < 3:
+            continue
+        left, right = children[0], children[-1]
+        if (left.get("fence") == right.get("fence") == "true"
+                and left.get("form") == "prefix" and right.get("form") == "postfix"
+                and left.get("stretchy") == right.get("stretchy") == "true"):
+            fenced = etree.Element(tag(mathml_ns, "mfenced"), open=left.text or "", close=right.text or "", separators="")
+            content = etree.SubElement(fenced, tag(mathml_ns, "mrow"))
+            for child in children[1:-1]:
+                content.append(child)
+            row.getparent().replace(row, fenced)
+    # Office can split astral bold-letter surrogate pairs during font-size edits.
+    # Express the same typography as BMP letters plus MathML style instead.
+    for node in mathml.iter():
+        if node.text and len(node.text) == 1:
+            code = ord(node.text)
+            for start, base in ((0x1D400, ord("A")), (0x1D41A, ord("a"))):
+                if start <= code < start + 26:
+                    node.text = chr(base + code - start)
+                    node.set("mathvariant", "bold")
+                    break
     result = transform(mathml)
     omath = result.find(f".//{tag(M, 'oMath')}")
     if omath is None and result.getroot().tag == tag(M, "oMath"):
         omath = result.getroot()
     if omath is None:
         raise ValueError(f"MathML conversion produced no equation: {tex}")
+    # Preserve text-style fractions as a smaller math argument, not a tall display.
+    for fraction in list(omath.findall(f".//{tag(M, 'f')}")):
+        levels = fraction.xpath("./m:num/m:argPr/m:scrLvl | ./m:den/m:argPr/m:scrLvl", namespaces=NS)
+        if len(levels) == 2 and all(level.get(tag(M, "val")) == "0" for level in levels):
+            for level in levels:
+                level.getparent().remove(level)
+            box = etree.Element(tag(M, "box"))
+            base = etree.SubElement(box, tag(M, "e"))
+            props = etree.SubElement(base, tag(M, "argPr"))
+            etree.SubElement(props, tag(M, "argSz"), {tag(M, "val"): "-1"})
+            fraction.getparent().replace(fraction, box)
+            base.append(fraction)
     fill_empty_nary_bases(omath)
+    for nary in omath.findall(f".//{tag(M, 'nary')}"):
+        props = nary.find(tag(M, "naryPr"))
+        if props is None:
+            props = etree.Element(tag(M, "naryPr"))
+            nary.insert(0, props)
+        for limit in ("sub", "sup"):
+            body = nary.find(tag(M, limit))
+            if body is None or (not len(body) and not (body.text or "").strip()):
+                hidden = props.find(tag(M, limit + "Hide"))
+                if hidden is None:
+                    hidden = etree.SubElement(props, tag(M, limit + "Hide"))
+                hidden.set(tag(M, "val"), "1")
+    space_function_runs(omath)
     if omath.xpath(".//m:nary/m:sub/m:eqArr | .//m:nary/m:sup/m:eqArr", namespaces=NS):
         raise ValueError(
             f"{formula['id']}: multiline integral/sum limit is not PowerPoint-safe; "
@@ -129,8 +208,13 @@ def formula_shape(formula, xfrm, shape_id, transform):
     if r"\sum" in tex and formula["box_px"][2] < 300 and formula["box_px"][3] >= 150:
         size = min(size, 14)
     font_size = round(float(formula.get("native_font_pt", size)) * 100)
+    color = formula.get("native_color_hex", "000000").lstrip("#")
+    if not re.fullmatch(r"[0-9A-Fa-f]{6}", color):
+        raise ValueError(f"Invalid native_color_hex in {formula['id']}: {color}")
     for run in wrapper.findall(f".//{tag(M, 'r')}"):
         run_props = etree.Element(tag(A, "rPr"), lang="en-US", sz=str(font_size))
+        fill = etree.SubElement(run_props, tag(A, "solidFill"))
+        etree.SubElement(fill, tag(A, "srgbClr"), val=color.upper())
         etree.SubElement(run_props, tag(A, "latin"), typeface="Cambria Math")
         run.insert(0, run_props)
     etree.SubElement(paragraph, tag(A, "endParaRPr"), lang="en-US", sz=str(font_size))
@@ -345,6 +429,29 @@ def self_check(mml2omml=None):
     shape = formula_shape({"id": "self-check", "latex": r"x^2+1", "box_px": [0, 0, 100, 50]}, xfrm, 2, transform)
     assert shape.xpath("count(.//m:oMath)", namespaces=NS) == 1.0
     assert shape.xpath("string(.//a:latin/@typeface)", namespaces=NS) == "Cambria Math"
+    spaced = formula_shape({"id": "function-gap", "latex": r"\sec x\tan x", "box_px": [0, 0, 200, 50]}, xfrm, 2, transform)
+    assert len(spaced.xpath(".//m:t[text()='\u2009']", namespaces=NS)) == 3
+    scripted = formula_shape({"id": "scripted-function-gap", "latex": r"a^x\ln N_0+\sec^2 x", "box_px": [0, 0, 200, 50]}, xfrm, 2, transform)
+    assert len(scripted.xpath(".//m:t[text()='\u2009']", namespaces=NS)) == 3
+    named = formula_shape({"id": "named-function-gap", "latex": r"(\operatorname{arccot} x)'", "box_px": [0, 0, 200, 50]}, xfrm, 2, transform)
+    assert named.xpath(".//m:r[m:t='arccot']/m:rPr/m:sty[@m:val='p']", namespaces=NS)
+    assert named.xpath(".//m:t[text()='\u2009']", namespaces=NS)
+    space_function_runs(scripted)
+    assert len(scripted.xpath(".//m:t[text()='\u2009']", namespaces=NS)) == 3
+    bold = formula_shape({"id": "bold-vector", "latex": r"\mathbf{F}=m\mathbf{a}", "box_px": [0, 0, 235, 58]}, xfrm, 2, transform)
+    assert "".join(bold.xpath(".//m:t/text()", namespaces=NS)) == "F=ma"
+    assert len(bold.xpath(".//m:sty[@m:val='b']", namespaces=NS)) == 2
+    colored = formula_shape({"id": "red-inline", "latex": "d/dx", "native_color_hex": "FF0000", "box_px": [0, 0, 100, 50]}, xfrm, 2, transform)
+    assert set(colored.xpath(".//a:srgbClr/@val", namespaces=NS)) == {"FF0000"}
+    integral = formula_shape({"id": "bare-integral", "latex": r"\int P\,dx", "box_px": [0, 0, 200, 80]}, xfrm, 2, transform)
+    assert len(integral.xpath(".//m:nary", namespaces=NS)) == 1
+    assert not integral.xpath(".//m:nary/m:e[not(*)]", namespaces=NS)
+    assert len(integral.xpath(".//m:naryPr/*[self::m:subHide or self::m:supHide][@m:val='1']", namespaces=NS)) == 2
+    fence = formula_shape({"id": "tall-fence", "latex": r"f\left(\frac{y}{x}\right)", "box_px": [0, 0, 100, 80]}, xfrm, 2, transform)
+    assert len(fence.xpath(".//m:d/m:e/m:f", namespaces=NS)) == 1
+    compact = formula_shape({"id": "compact-fraction", "latex": r"x=\tfrac12gt^2", "box_px": [0, 0, 200, 50]}, xfrm, 2, transform)
+    assert len(compact.xpath(".//m:box/m:e[m:argPr/m:argSz[@m:val='-1']]/m:f", namespaces=NS)) == 1
+    assert not compact.xpath(".//m:scrLvl", namespaces=NS)
     for latex in (r"\sum_{k=1}^{\infty} u_k(z)", r"\int_C u_k(z)\,dz", r"\sum_0^\infty"):
         sample = formula_shape({"id": "nary-check", "latex": latex, "box_px": [0, 0, 100, 50]}, xfrm, 3, transform)
         assert sample.xpath("count(.//m:nary/m:e[not(*) and not(normalize-space())])", namespaces=NS) == 0
