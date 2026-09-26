@@ -156,5 +156,5 @@ try {
     throw
 } finally {
     if ($presentation -ne $null) { $presentation.Close() }
-    $app.Quit()
+    if ($app.Presentations.Count -eq 0) { $app.Quit() }
 }

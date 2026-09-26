@@ -86,5 +86,5 @@ try {
     if ($FailOnCollision -and $collisions -gt 0) { throw "$collisions formula/prose collisions require review" }
 } finally {
     if ($presentation -ne $null) { $presentation.Close() }
-    $app.Quit()
+    if ($app.Presentations.Count -eq 0) { $app.Quit() }
 }
