@@ -73,6 +73,7 @@ When post-finalization QA finds a page defect, repair that page's manifest/asset
 - `scripts/equationize.py`, `scripts/calibrate_math_geometry.ps1`, `scripts/measure_math_geometry.py`, `scripts/check_formula_text_spacing.ps1`: native math conversion and visual QA. Legacy font-size scripts are diagnostic only, not final source-calibrated gates.
 - `scripts/audit_deck.py`: reconcile the final deck's presentation-order pages, formula identities, and remaining picture counts with the run inventory. This structural gate does not replace visual review.
 - `scripts/render_deck.ps1`: read-only PowerPoint export at each source page's recorded pixel dimensions, preserving previous render folders and unrelated open presentations.
+- `scripts/refine_math_geometry.ps1`, `scripts/measure_isolated_math.py`: targeted full-ink refinement for source-verified formula outliers after normal calibration; see the QA recipe before use.
 
 ## 致谢
 
