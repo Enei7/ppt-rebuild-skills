@@ -71,6 +71,17 @@ When a source-verified black or gray formula is unavoidably overlapped by a colo
 
 Run `calibrate_math_geometry.ps1` after equation conversion, using a fresh output file. It first shrinks native equations whose PowerPoint bounds exceed their source boxes (including fractions), then measures equation ink in the original `source.png` and PowerPoint-rendered formula-only slides, adjusts nary/wide-display equations from Office `BoundLeft/Top/Width/Height`, and writes a report under the run directory. A source crop touching an edge is not automatically invalid; a partial glyph with too little ink is. Do not blindly enlarge every inline formula: stacked Office fractions may need a different LaTeX structure when the source uses compact linear notation, and split text/formula boxes may have inaccurate source bounds. Inspect report warnings/outliers, then compare full-slide renders for collisions and baselines. Run `check_formula_text_spacing.ps1 -ReportTightGaps -ReportBaseline` on the actual final candidate; its ≥4 pt single-line overlaps are blockers, near-zero word junctions and >5 pt compact-inline center differences need visual review. Repair adjacent text and formula objects together so that widening a gap does not create a collision with the next run. A bounded vertical correction is reasonable only after checking the rendered line; nary operators and fractions have inherently taller ink and must not be centered like letters. Rerender and run the checker with `-FailOnCollision -ReportBaseline` after repairs. Preserve the native equation object; do not hide a source bitmap over it. Legacy `normalize_math_font.ps1`/`check_math_font.ps1` are useful only when no source crop is available; their mean-point-size rule is not a valid acceptance threshold after source-geometry calibration.
 
+At a source-verified italic/prose rich-text run boundary, an ordinary space or
+NBSP can remain visually swallowed by italic overhang even though the character
+is present in OOXML. If the saved PowerPoint render still shows glued words,
+replace only the reviewed boundary space with U+2002 EN SPACE; an explicit
+upright whitespace-only run is an alternative when the surrounding run style
+must not carry the space. Do not blanket-replace spaces or alter the neighboring
+math, wording, or font sizes. Verify the result in a fresh full-slide render.
+Because the wider boundary changes the line's visible extent, remeasure and
+rerun the affected mixed-line placement or spacing check so the repaired gap
+does not create contact with the following prose, formula, or definition.
+
 ## Validation and recovery
 
 Before equation conversion, require every page `validation.json` to have top-level `passed: true`, then `editppt run record` and `editppt run finalize`. Keep its output unchanged as the recovery deck. Run equation conversion and source-geometry calibration to separate output paths. The later passes mutate only copies of the finalized PPTX; running `editppt run finalize` again would replace them with the base output. Run `equationize.py --audit-existing` on the **actual final file after its last save**; its empty-nary gate must pass before delivery. If PowerPoint COM is unavailable, run that same structural audit and explicitly report the missing visual-baseline calibration.
