@@ -29,6 +29,49 @@ EMU = 914400
 SLIDE_RE = re.compile(r"ppt/slides/slide(\d+)\.xml$")
 NARY_BOUNDARIES = {"=", "+", "-", "−", ",", ";", ")", "]", "<", ">", "≤", "≥"}
 FUNCTION_NAMES = {"sin", "cos", "tan", "cot", "sec", "csc", "sinh", "cosh", "tanh", "ln", "log", "exp", "arcsin", "arccos", "arctan", "arccot", "Re", "Im"}
+MATHML = "http://www.w3.org/1998/Math/MathML"
+XML = "http://www.w3.org/XML/1998/namespace"
+
+
+def mathml_space_text(width):
+    """Return a Unicode approximation for the positive TeX spaces we support."""
+    match = re.fullmatch(r"\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))em\s*", width or "")
+    if not match:
+        return None
+    value = float(match.group(1))
+    if value <= 0:
+        return None
+    for expected, replacement in (
+        (0.167, "\u2009"),  # \,
+        (0.278, "\u2005"),  # \;
+        (1.0, "\u2003"),  # \quad
+        (2.0, "\u2003\u2003"),  # \qquad
+    ):
+        if abs(value - expected) < 0.001:
+            return replacement
+    return None
+
+
+def preserve_positive_mathml_spacing(root):
+    """Replace known positive mspace widths before Office's XSL drops them."""
+    replaced = 0
+    for node in list(root.iter(tag(MATHML, "mspace"))):
+        replacement = mathml_space_text(node.get("width"))
+        if replacement is None:
+            continue
+        text = etree.Element(tag(MATHML, "mtext"))
+        text.set(tag(XML, "space"), "preserve")
+        text.text = replacement
+        node.getparent().replace(node, text)
+        replaced += 1
+    return replaced
+
+
+def is_whitespace_math_run(node):
+    if node is None or node.tag != tag(M, "r"):
+        return False
+    text = "".join(node.itertext())
+    return bool(text) and not text.strip()
 
 
 def tag(namespace, name):
@@ -70,8 +113,15 @@ def fill_empty_nary_bases(root):
         if base is None or len(base) or (base.text or "").strip():
             continue
         next_item = nary.getnext()
+        spacing = []
+        while is_whitespace_math_run(next_item):
+            spacing.append(next_item)
+            next_item = next_item.getnext()
         next_text = "" if next_item is None else "".join(next_item.itertext()).strip()
-        if next_item is not None and next_item.tag.startswith(f"{{{M}}}") and next_text not in NARY_BOUNDARIES:
+        if (next_item is not None and next_item.tag.startswith(f"{{{M}}}")
+                and next_text and next_text not in NARY_BOUNDARIES):
+            for gap in spacing:
+                base.append(gap)
             base.append(next_item)
         else:
             # Standalone operators (e.g. a sum symbol embedded in a sentence)
@@ -122,7 +172,8 @@ def formula_shape(formula, xfrm, shape_id, transform):
     if unknown:
         raise ValueError(f"Unconverted LaTeX command in {formula['id']}: {unknown}")
     # The Office stylesheet understands mfenced, but loses stretchy mo fences.
-    mathml_ns = "http://www.w3.org/1998/Math/MathML"
+    mathml_ns = MATHML
+    preserve_positive_mathml_spacing(mathml)
     for node in mathml.iter():
         if node.text in FUNCTION_NAMES and node.tag in {tag(mathml_ns, "mi"), tag(mathml_ns, "mo")}:
             node.tag = tag(mathml_ns, "mi")
