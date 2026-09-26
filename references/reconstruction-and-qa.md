@@ -14,6 +14,8 @@ For each standalone mathematical expression, create a unique per-page id and a s
 
 Keep the source box formula-only, with modest padding. Do not include the next prose line to make the box taller: source-ink measurement will then calibrate to that unrelated line and can move an otherwise correct inline equation into the surrounding text. Check the crop itself, not just the page preview.
 
+PDF text extraction is only a hint for inventory coverage: font-name heuristics can miss whole equations, and reading-order text can flatten superscripts (for example `e^{3x}` into `e3x`). Check the visible source even when extraction succeeds. Do not mark mathematical text as fully editable merely because its flattened characters occupy a native text box; required equations belong in the native-math inventory.
+
 ```json
 {
   "id": "formula_03",
@@ -46,6 +48,8 @@ Bold mathematical letters must survive a PowerPoint save/reopen round trip. The 
 Inspect function-name spacing in the native render (for example `\sin x`, `\cot x`, and `\sec x\tan x`). Office's MathML stylesheet can discard TeX thin-space nodes even when the source crop looks correct. The converter inserts an explicit thin-space Office Math run at adjacent function/letter boundaries; keep this covered by `equationize.py --self-check`. Do not compensate by moving the entire equation or baking the formula into a picture.
 
 Use Microsoft YaHei for ordinary visible text, including explicit run fonts, end-paragraph properties, and theme aliases where applicable. Do not force the equation math run to YaHei; Office math glyphs use a math font, normally Cambria Math. Match **visible glyph bounds and line baseline**, not just nominal point sizes. A `16 pt` Office summation can look less than half the height of its PDF counterpart. For each page, prefer source text boxes and `text_hints` as a starting point, then inspect the rendered slide. Small OCR noise does not justify changing a clearly visible word or formula.
+
+Dense formula tables especially need a source-supported `native_font_pt` starting size. Crop height includes numerator/denominator and padding; deriving independent point sizes from that height can make fractions much larger than adjacent one-line entries and collide across rows. Keep one visual math text level where the source uses one, then calibrate and inspect the native result. This is not a universal point-size rule.
 
 For remaining size outliers, render the affected equation alone on its original slide, compare its full ink bounds against the formula-only source crop, then resize and rerender before translating its ink center. This avoids measuring clipped native ink inside an overly tight source rectangle. If a tall integral alone forces all adjacent letters too small, calibrate the n-ary control glyph separately from the math runs instead of shrinking the whole expression; preserve the editable operator, inspect the full-slide result, and audit again after saving.
 

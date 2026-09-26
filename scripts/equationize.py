@@ -28,7 +28,7 @@ NS = {"p": P, "a": A, "r": R, "m": M}
 EMU = 914400
 SLIDE_RE = re.compile(r"ppt/slides/slide(\d+)\.xml$")
 NARY_BOUNDARIES = {"=", "+", "-", "−", ",", ";", ")", "]", "<", ">", "≤", "≥"}
-FUNCTION_NAMES = {"sin", "cos", "tan", "cot", "sec", "csc", "sinh", "cosh", "tanh", "ln", "log", "exp", "arcsin", "arccos", "arctan", "arccot"}
+FUNCTION_NAMES = {"sin", "cos", "tan", "cot", "sec", "csc", "sinh", "cosh", "tanh", "ln", "log", "exp", "arcsin", "arccos", "arctan", "arccot", "Re", "Im"}
 
 
 def tag(namespace, name):
@@ -452,6 +452,9 @@ def self_check(mml2omml=None):
     named = formula_shape({"id": "named-function-gap", "latex": r"(\operatorname{arccot} x)'", "box_px": [0, 0, 200, 50]}, xfrm, 2, transform)
     assert named.xpath(".//m:r[m:t='arccot']/m:rPr/m:sty[@m:val='p']", namespaces=NS)
     assert named.xpath(".//m:t[text()='\u2009']", namespaces=NS)
+    parts = formula_shape({"id": "complex-parts", "latex": r"\operatorname{Re}p>|\operatorname{Im}a|", "box_px": [0, 0, 200, 50]}, xfrm, 2, transform)
+    assert len(parts.xpath(".//m:r[m:t='Re' or m:t='Im']/m:rPr/m:sty[@m:val='p']", namespaces=NS)) == 2
+    assert len(parts.xpath(".//m:t[text()='\u2009']", namespaces=NS)) == 2
     space_function_runs(scripted)
     assert len(scripted.xpath(".//m:t[text()='\u2009']", namespaces=NS)) == 3
     bold = formula_shape({"id": "bold-vector", "latex": r"\mathbf{F}=m\mathbf{a}", "box_px": [0, 0, 235, 58]}, xfrm, 2, transform)
