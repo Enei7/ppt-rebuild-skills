@@ -33,6 +33,8 @@ Use `\tfrac` for genuinely compact stacked source fractions; the converter prese
 
 Bare `\int` must become a native n-ary operator even without limits; an ordinary integral character has the wrong height. Explicit `\left...\right` fences are normalized to native delimiters so they grow around fractions. The converter's self-check covers both structures, but a PowerPoint save/reopen and visual check remain required.
 
+Matrix environments (`pmatrix`, `bmatrix`, `Bmatrix`, `vmatrix`, `Vmatrix`) also need structural native delimiters. Some MathML converters emit their fences as ordinary adjacent characters, which PowerPoint displays only at the middle row's height. The converter normalizes the matched pair around the matrix before transformation; verify all matrix rows stay inside the fences after a PowerPoint save/reopen. Retain the native matrix rather than covering a broken fence with a bitmap.
+
 Treat source-positioned math blocks as separate objects even if they share a row. A left-hand equation and a far-right condition require independent formula-only crops, ids, and `box_px`; do not merge them with `\qquad` to imitate horizontal page spacing. The page-stage crop can hide this error because its pixels already contain the gap; after native conversion Office Math recomputes TeX space and pulls the condition left. Render at least one converted representative before finalization, then fit each equation to its own source box.
 
 ## Font and geometry

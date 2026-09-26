@@ -140,6 +140,22 @@ def formula_shape(formula, xfrm, shape_id, transform):
             for child in children[1:-1]:
                 content.append(child)
             row.getparent().replace(row, fenced)
+    # Matrix environments emit plain mo siblings rather than stretchy fences.
+    # Office otherwise renders parentheses only as small middle-row characters.
+    matrix_fences = {"(": ")", "[": "]", "{": "}", "|": "|", "‖": "‖"}
+    for table in reversed(list(mathml.iter(tag(mathml_ns, "mtable")))):
+        parent = table.getparent()
+        index = parent.index(table)
+        if index == 0 or index + 1 >= len(parent):
+            continue
+        left, right = parent[index - 1], parent[index + 1]
+        if (left.tag == right.tag == tag(mathml_ns, "mo")
+                and left.text in matrix_fences and matrix_fences[left.text] == right.text):
+            fenced = etree.Element(tag(mathml_ns, "mfenced"), open=left.text, close=right.text, separators="")
+            left.addprevious(fenced)
+            parent.remove(left)
+            parent.remove(right)
+            fenced.append(table)
     # Office can split astral bold-letter surrogate pairs during font-size edits.
     # Express the same typography as BMP letters plus MathML style instead.
     for node in mathml.iter():
@@ -452,6 +468,10 @@ def self_check(mml2omml=None):
     compact = formula_shape({"id": "compact-fraction", "latex": r"x=\tfrac12gt^2", "box_px": [0, 0, 200, 50]}, xfrm, 2, transform)
     assert len(compact.xpath(".//m:box/m:e[m:argPr/m:argSz[@m:val='-1']]/m:f", namespaces=NS)) == 1
     assert not compact.xpath(".//m:scrLvl", namespaces=NS)
+    for environment in ("pmatrix", "bmatrix", "Bmatrix", "vmatrix", "Vmatrix"):
+        matrix = formula_shape({"id": "matrix-fence", "latex": "G=\\begin{" + environment + r"}g_{11}&g_{12}\\g_{21}&g_{22}\end{" + environment + "}", "box_px": [0, 0, 300, 150]}, xfrm, 2, transform)
+        assert len(matrix.xpath(".//m:d/m:e/m:m", namespaces=NS)) == 1, environment
+        assert len(matrix.xpath(".//m:m/m:mr", namespaces=NS)) == 2, environment
     for latex in (r"\sum_{k=1}^{\infty} u_k(z)", r"\int_C u_k(z)\,dz", r"\sum_0^\infty"):
         sample = formula_shape({"id": "nary-check", "latex": latex, "box_px": [0, 0, 100, 50]}, xfrm, 3, transform)
         assert sample.xpath("count(.//m:nary/m:e[not(*) and not(normalize-space())])", namespaces=NS) == 0
