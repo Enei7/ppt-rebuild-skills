@@ -274,17 +274,16 @@ def doctor(args):
         "and references."
     )
     print(
-        "paddle approval rejection: ask the user to authorize OCR and explain that it corrects "
-        "text boxes, font sizes, and size groups so reconstructed PPT text sizing stays stable."
+        "OCR data handling: respect an existing offline choice; do not request upload approval "
+        "again merely because a token is missing or network access was declined."
     )
     if hints["paddle_token"] == "unset":
         print(
-            "text hints: ASK THE USER once — a free PaddleOCR token makes text hints content-aware "
-            "(recognized text + cleaner blocks, noticeably better text fidelity). The free personal "
-            "quota is currently more than enough for this skill, so applying is risk-free with no "
-            "extra cost. They can apply at "
-            "{url} and you run `{cmd}`; or they can choose to continue with the offline detector. "
-            "Wait for their choice before reconstructing pages, then do not ask again.".format(
+            "text hints: offline geometry detection is ready; recognized text is not included. "
+            "If the user already chose offline processing, continue without asking again. "
+            "Optional cloud OCR requires the user's data-handling choice and a token from "
+            "{url}, configured with `{cmd}`. Check the provider's current terms and quota "
+            "before making cost claims.".format(
                 url=hints["apply_url"], cmd=hints["configure_command"]
             )
         )
