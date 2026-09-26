@@ -303,6 +303,7 @@ Text-size fitting:
 - Keep default fitting enabled for first drafts. Set `fit_text: false` only when the page author has manually calibrated the box and font size.
 - `text_boxes[].box_px` should describe the source text bounds plus modest padding. Do not use an unrelated card, chart, or table cell group as the text box, because the fitter infers size from the supplied box. Badge-centered text is the explicit shared-box exception in `page-decision-tree.md` section 3.6.
 - Optional tuning fields are `min_font_size`, `max_font_size`, `text_fit_safety`, and `line_height`.
+- `line_height` is a fitting estimate only; the current builder does not serialize it as Office paragraph line spacing. For source-specific large or irregular line gaps, use one complete prose span per source line with measured `box_px`. Keep inline formulas on that line's baseline and punctuation on the correct side. Do not split ordinary prose into one box per word, and do not treat a multiline preview as proof of Office line spacing.
 
 Text alignment:
 
