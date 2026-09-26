@@ -397,6 +397,15 @@ Allowed `corner_category` values: `straight`, `small-radius`, `large-radius`, `p
 }
 ```
 
+For formula geometry, `formula_inventory[].box_px` and the matching
+`images[].box_px` are placement boxes. If a `user-provided` temporary formula
+image is an exact crop from a different source rectangle, preserve that true
+rectangle as `source_crop_px` (with matching `source_page`) in the joined
+`asset_provenance` and `visual_inventory` records. Keep their crop values
+identical. Measurement and crop-review tools use the true source rectangle for
+source ink and the formula box for native placement; they fail on conflicting
+crop evidence or a source-page mismatch rather than choosing one silently.
+
 Formula source decisions and failure handling are defined in `page-decision-tree.md` section 3.2.
 
 ## `pages/page_NNN/imagegen-jobs.json`

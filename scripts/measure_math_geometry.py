@@ -7,6 +7,11 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from formula_source_geometry import (
+    resolve_formula_source_geometry,
+    translate_source_ink_to_target,
+)
+
 
 def ink_box(pixels):
     dark = np.min(pixels[:, :, :3], axis=2) < 180
@@ -32,11 +37,23 @@ def measure(run, renders=None):
         for formula in manifest.get("formula_inventory", []):
             if not native_formula(formula):
                 continue
-            x, y, w, h = map(int, formula["box_px"])
-            original = ink_box(source[y : y + h, x : x + w])
-            current = None if rendered is None else ink_box(rendered[y : y + h, x : x + w])
-            row = {"page": page, "id": formula["id"], "latex": formula.get("latex", ""), "box_px": [x, y, w, h],
-                   "source_ink": original, "rendered_ink": current,
+            geometry = resolve_formula_source_geometry(
+                manifest, formula, page, source.shape[1::-1]
+            )
+            target_box, source_box = geometry.as_lists()
+            tx, ty, tw, th = map(int, target_box)
+            sx, sy, sw, sh = map(int, source_box)
+            source_ink_in_box = ink_box(source[sy : sy + sh, sx : sx + sw])
+            original = translate_source_ink_to_target(
+                source_ink_in_box, source_box, target_box
+            )
+            current = None if rendered is None else ink_box(rendered[ty : ty + th, tx : tx + tw])
+            row = {"page": page, "id": formula["id"], "latex": formula.get("latex", ""),
+                   "box_px": target_box, "target_box_px": target_box,
+                   "source_box_px": source_box, "source_box_kind": geometry.source_kind,
+                   "source_box_evidence": list(geometry.evidence),
+                   "source_ink": original, "source_ink_in_source_box": source_ink_in_box,
+                   "rendered_ink": current,
                    "source_size_px": list(source.shape[1::-1])}
             if original and current:
                 source_width = original[2] - original[0]
@@ -44,7 +61,12 @@ def measure(run, renders=None):
                 row["width_ratio"] = round(source_width / rendered_width, 5)
                 row["dx_px"] = round((original[0] + original[2] - current[0] - current[2]) / 2, 2)
                 row["dy_px"] = round((original[1] + original[3] - current[1] - current[3]) / 2, 2)
-                row["edge_touch"] = current[0] <= 1 or current[1] <= 1 or current[2] >= w - 1 or current[3] >= h - 1
+                row["edge_touch"] = current[0] <= 1 or current[1] <= 1 or current[2] >= tw - 1 or current[3] >= th - 1
+            if source_ink_in_box:
+                row["source_edge_touch"] = (
+                    source_ink_in_box[0] <= 1 or source_ink_in_box[1] <= 1
+                    or source_ink_in_box[2] >= sw - 1 or source_ink_in_box[3] >= sh - 1
+                )
             rows.append(row)
     return rows
 
@@ -56,6 +78,9 @@ def self_check():
     assert ink_box(np.full_like(blank, 255)) is None
     assert native_formula({"decision": "source-exact-formula-crop"})
     assert not native_formula({"decision": "embedded-editable-text-run"})
+    assert translate_source_ink_to_target(
+        [10, 20, 30, 40], [100, 100, 80, 60], [200, 190, 100, 80]
+    ) == [20.0, 30.0, 40.0, 50.0]
 
 
 if __name__ == "__main__":

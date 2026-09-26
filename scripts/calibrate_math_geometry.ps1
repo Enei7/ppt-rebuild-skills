@@ -93,10 +93,12 @@ try {
             $warnings.Add("$($row.page)/$($row.id): no source ink in formula box")
             continue
         }
-        $w = [int]$row.box_px[2]; $h = [int]$row.box_px[3]
-        $touchesEdge = [int]$row.source_ink[0] -le 2 -or [int]$row.source_ink[1] -le 2 -or [int]$row.source_ink[2] -ge $w - 2 -or [int]$row.source_ink[3] -ge $h - 2
-        $inkWidth = [int]$row.source_ink[2] - [int]$row.source_ink[0]
-        $inkHeight = [int]$row.source_ink[3] - [int]$row.source_ink[1]
+        $sourceBox = if ($null -ne $row.source_box_px) { $row.source_box_px } else { $row.box_px }
+        $sourceInkRaw = if ($null -ne $row.source_ink_in_source_box) { $row.source_ink_in_source_box } else { $row.source_ink }
+        $w = [double]$sourceBox[2]; $h = [double]$sourceBox[3]
+        $touchesEdge = [double]$sourceInkRaw[0] -le 2 -or [double]$sourceInkRaw[1] -le 2 -or [double]$sourceInkRaw[2] -ge $w - 2 -or [double]$sourceInkRaw[3] -ge $h - 2
+        $inkWidth = [double]$sourceInkRaw[2] - [double]$sourceInkRaw[0]
+        $inkHeight = [double]$sourceInkRaw[3] - [double]$sourceInkRaw[1]
         if ($touchesEdge -and ($inkWidth -lt $w * 0.55 -or $inkHeight -lt $h * 0.55)) {
             $warnings.Add("$($row.page)/$($row.id): source crop clips formula ink")
             continue

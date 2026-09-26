@@ -7,6 +7,10 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from formula_source_geometry import (
+    resolve_formula_source_geometry,
+    translate_source_ink_to_target,
+)
 from measure_math_geometry import ink_box
 
 
@@ -38,19 +42,21 @@ def filter_source_ink(pixels, source_ink_filter=None):
     return filtered
 
 
-def compare(source, rendered, box, source_ink_filter=None):
+def compare(source, rendered, source_box, target_box=None, source_ink_filter=None):
     if source.shape != rendered.shape:
         raise ValueError("Source and isolated render dimensions differ")
-    x, y, width, height = map(int, box)
+    if target_box is None:
+        target_box = source_box
+    x, y, width, height = map(int, source_box)
     if min(x, y) < 0 or min(width, height) <= 0 or x + width > source.shape[1] or y + height > source.shape[0]:
-        raise ValueError(f"Invalid formula source box: {box}")
+        raise ValueError(f"Invalid formula source box: {source_box}")
     source_ink_filter = validate_source_ink_filter(source_ink_filter)
     source_crop = filter_source_ink(
         source[y:y + height, x:x + width], source_ink_filter
     )
-    original = ink_box(source_crop)
+    original_in_source_box = ink_box(source_crop)
     current = ink_box(rendered)
-    if original is None:
+    if original_in_source_box is None:
         suffix = (
             f" after source_ink_filter={source_ink_filter!r}"
             if source_ink_filter is not None else ""
@@ -58,14 +64,21 @@ def compare(source, rendered, box, source_ink_filter=None):
         raise ValueError(f"Missing source formula ink{suffix}")
     if current is None:
         raise ValueError("Missing rendered formula ink")
-    original = [original[0] + x, original[1] + y, original[2] + x, original[3] + y]
+    expected_in_target_box = translate_source_ink_to_target(
+        original_in_source_box, source_box, target_box
+    )
+    tx, ty, _, _ = map(float, target_box)
+    original = [expected_in_target_box[0] + tx, expected_in_target_box[1] + ty,
+                expected_in_target_box[2] + tx, expected_in_target_box[3] + ty]
     if current[0] == 0 or current[1] == 0 or current[2] == rendered.shape[1] or current[3] == rendered.shape[0]:
         raise ValueError("Native ink touches canvas edge; resolve clipping before measurement")
     ratio = min((original[2] - original[0]) / (current[2] - current[0]),
                 (original[3] - original[1]) / (current[3] - current[1]))
     return {"ratio": ratio, "dx_px": (original[0] + original[2] - current[0] - current[2]) / 2,
             "dy_px": (original[1] + original[3] - current[1] - current[3]) / 2,
-            "source_ink": original, "rendered_ink": current,
+            "source_ink": original, "source_ink_in_source_box": original_in_source_box,
+            "source_box_px": list(map(float, source_box)),
+            "target_box_px": list(map(float, target_box)), "rendered_ink": current,
             "source_size_px": [source.shape[1], source.shape[0]]}
 
 
@@ -83,14 +96,20 @@ def measure(run, folder):
             raise ValueError(f"Formula inventory id is not unique: {target}")
         source = np.asarray(Image.open(page / "source.png").convert("RGB"))
         rendered = np.asarray(Image.open(folder / f"formula_{index:04}.png").convert("RGB"))
+        geometry = resolve_formula_source_geometry(
+            manifest, matches[0], int(target["page"]), source.shape[1::-1]
+        )
         result.append({
             **target,
             **compare(
                 source,
                 rendered,
-                matches[0]["box_px"],
+                geometry.source_box_px,
+                geometry.target_box_px,
                 source_ink_filter=source_ink_filter,
             ),
+            "source_box_kind": geometry.source_kind,
+            "source_box_evidence": list(geometry.evidence),
         })
     return result
 

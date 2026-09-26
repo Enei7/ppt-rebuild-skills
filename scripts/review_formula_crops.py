@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+from formula_source_geometry import resolve_formula_source_geometry
 from measure_math_geometry import ink_box, native_formula
 
 
@@ -48,11 +49,19 @@ def export_review(run, output, selected=None):
             if ident in seen:
                 raise ValueError(f'Duplicate formula id in {page.name}: {ident}')
             seen.add(ident)
-            crop, ink, edges = inspect_crop(source, formula['box_px'])
+            geometry = resolve_formula_source_geometry(
+                manifest, formula, int(page.name.split('_')[-1]), source.size
+            )
+            target_box, source_box = geometry.as_lists()
+            crop, ink, edges = inspect_crop(source, source_box)
             filename = f'crops/{page.name}_{len(seen):04}.png'
             crop.save(output / filename)
             rows.append({'page': int(page.name.split('_')[-1]), 'id': ident,
-                         'box_px': formula['box_px'], 'latex': formula.get('latex', ''),
+                         'box_px': target_box, 'target_box_px': target_box,
+                         'source_box_px': source_box,
+                         'source_box_kind': geometry.source_kind,
+                         'source_box_evidence': list(geometry.evidence),
+                         'latex': formula.get('latex', ''),
                          'crop': filename, 'ink': ink, 'edge_candidates': edges,
                          'needs_close_review': bool(edges) or ink is None})
     font = ImageFont.load_default(size=18)
