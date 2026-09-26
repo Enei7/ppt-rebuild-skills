@@ -50,6 +50,8 @@ python .\scripts\measure_math_geometry.py --self-check
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\calibrate_math_geometry.ps1 -Deck <native-math.pptx> -Run <run-dir> -Output <calibrated.pptx> -Python <same-python>
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check_formula_text_spacing.ps1 -Deck <calibrated.pptx> -Run <run-dir> -ReportTightGaps -ReportBaseline -FailOnCollision
 python .\scripts\equationize.py --audit-existing --input <calibrated.pptx>
+python .\scripts\audit_deck.py --run <run-dir> --deck <calibrated.pptx> --report <new-audit-report.json>
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\render_deck.ps1 -Deck <calibrated.pptx> -Run <run-dir> -Folder <new-render-folder>
 ```
 
 Use a compatible `MML2OMML.XSL` with `--mml2omml <path>` if not auto-detected. The process-scoped PowerShell execution-policy flag changes no machine policy; inspect scripts before running them. Geometry calibration first fits oversized native equations, including fractions, inside their source boxes, then calibrates n-ary/wide math against source ink; it is not a blanket point-size rule. Ambiguous compact inline formulas still need visual review. After the **last** PowerPoint save, repeat `--audit-existing` on the actual delivered file. If PowerPoint COM is unavailable, run the structural audit and explicitly disclose that visual baseline calibration was not performed; do not present it as fully verified.
@@ -69,6 +71,8 @@ When post-finalization QA finds a page defect, repair that page's manifest/asset
 - `references/cli-helper.md`, `references/manifest-schema.md`, `references/page-decision-tree.md`: commands, page contracts, and object decisions.
 - `references/reconstruction-and-qa.md`: source crops, formula inventory, calibration, and recovery.
 - `scripts/equationize.py`, `scripts/calibrate_math_geometry.ps1`, `scripts/measure_math_geometry.py`, `scripts/check_formula_text_spacing.ps1`: native math conversion and visual QA. Legacy font-size scripts are diagnostic only, not final source-calibrated gates.
+- `scripts/audit_deck.py`: reconcile the final deck's presentation-order pages, formula identities, and remaining picture counts with the run inventory. This structural gate does not replace visual review.
+- `scripts/render_deck.ps1`: read-only PowerPoint export at each source page's recorded pixel dimensions, preserving previous render folders and unrelated open presentations.
 
 ## 致谢
 
