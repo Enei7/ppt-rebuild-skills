@@ -194,6 +194,18 @@ def formula_shape(formula, xfrm, shape_id, transform):
             node.set("mathvariant", "normal")
     for row in reversed(list(mathml.iter(tag(mathml_ns, "mrow")))):
         children = list(row)
+        # cases emits one stretchy opening brace plus a table, with no closing mo.
+        # Office's stylesheet needs an explicit empty closing fence to stretch it.
+        if (len(children) == 2
+                and children[0].tag == tag(mathml_ns, "mo")
+                and children[0].text == "{"
+                and children[0].get("fence") == "true"
+                and children[0].get("form") == "prefix"
+                and children[1].tag == tag(mathml_ns, "mtable")):
+            fenced = etree.Element(tag(mathml_ns, "mfenced"), open="{", close="", separators="")
+            fenced.append(children[1])
+            row.getparent().replace(row, fenced)
+            continue
         if len(children) < 3:
             continue
         left, right = children[0], children[-1]
