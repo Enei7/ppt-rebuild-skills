@@ -11,6 +11,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'native_shape_lookup.ps1')
 if (-not (Test-Path -LiteralPath $Deck)) { throw "Deck not found: $Deck" }
 if (-not (Test-Path -LiteralPath $Run)) { throw "Run not found: $Run" }
 $app = New-Object -ComObject PowerPoint.Application
@@ -45,7 +46,7 @@ try {
             }
         }
         foreach ($id in $formulaIds) {
-            $shape = $slide.Shapes.Item($id)
+            $shape = Get-ExactSlideShape $slide ([string]$id)
             $range = $shape.TextFrame2.TextRange
             $left = [double]$range.BoundLeft
             $right = $left + [double]$range.BoundWidth - 6

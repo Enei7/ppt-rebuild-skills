@@ -8,6 +8,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'native_shape_lookup.ps1')
 if (-not (Test-Path -LiteralPath $Deck)) { throw "Deck not found: $Deck" }
 if (-not (Test-Path -LiteralPath $Run)) { throw "Run not found: $Run" }
 if ([IO.Path]::GetFullPath($Deck) -eq [IO.Path]::GetFullPath($Output)) { throw 'Output must differ from input' }
@@ -59,7 +60,7 @@ try {
     $fitted = New-Object 'System.Collections.Generic.HashSet[string]'
     foreach ($row in $sourceRows) {
         $key = "$($row.page)/$($row.id)"
-        $shape = $presentation.Slides.Item([int]$row.page).Shapes.Item([string]$row.id)
+        $shape = Get-ExactSlideShape ($presentation.Slides.Item([int]$row.page)) ([string]$row.id)
         $range = $shape.TextFrame2.TextRange
         $pxPerPointX = [double]$row.source_size_px[0] / [double]$presentation.PageSetup.SlideWidth
         $pxPerPointY = [double]$row.source_size_px[1] / [double]$presentation.PageSetup.SlideHeight
@@ -103,7 +104,7 @@ try {
             $warnings.Add("$($row.page)/$($row.id): source crop clips formula ink")
             continue
         }
-        $shape = $presentation.Slides.Item([int]$row.page).Shapes.Item([string]$row.id)
+        $shape = Get-ExactSlideShape ($presentation.Slides.Item([int]$row.page)) ([string]$row.id)
         $range = $shape.TextFrame2.TextRange
         $pxPerPointX = [double]$row.source_size_px[0] / [double]$presentation.PageSetup.SlideWidth
         $pxPerPointY = [double]$row.source_size_px[1] / [double]$presentation.PageSetup.SlideHeight

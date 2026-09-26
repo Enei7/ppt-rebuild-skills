@@ -83,4 +83,12 @@ Use `python <skill-root>/scripts/audit_deck.py --run <run> --deck <final.pptx> -
 
 For multiple input decks, keep one run and one final file per input unless the user requests a combined deck. Preserve filenames with spaces when resolving inputs. Page authoring may run in parallel across independent runs, but serialize desktop PowerPoint operations: its shared COM application can otherwise mix selections or be closed by another worker. Track and validate each deck separately; a successful chapter does not imply the entire batch passed. Do not publish source PDFs or generated decks along with reusable skill changes unless specifically authorized.
 
+Formula object identities are case-sensitive. PowerPoint's `Shapes.Item(name)`
+lookup is not: names such as `inline_G` and `inline_g` can select the same shape,
+silently moving or resizing the wrong formula. All bundled geometry passes use
+`native_shape_lookup.ps1` to require one exact-case name match. Use that helper
+in custom COM passes too; never lowercase formula IDs. Validate the actual
+render and audit after a save, since a correct inventory count alone cannot
+detect a formula moved under another object.
+
 For a failed formula: inspect the source PDF crop and LaTeX, correct the inventory entry, rerun equation conversion from the unchanged finalized deck, and recalibrate. For a failed page object: repair its page-owned manifest/assets, rebuild/validate/record that page through `editppt`, re-finalize, then rerun post-processing. Do not repeat an unchanged failing command. If a library, Office stylesheet, PowerPoint COM, worker, or source detail is genuinely unavailable, preserve successful artifacts and report the limitation rather than calling the deck finished.

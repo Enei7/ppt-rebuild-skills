@@ -11,6 +11,7 @@ param(
 # Reflow only explicit, source-reviewed mixed prose/math line recipes.
 # Formula font, color, AutoSize, and Office Math structure are never mutated.
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'native_shape_lookup.ps1')
 $Deck = (Resolve-Path -LiteralPath $Deck).Path
 $Run = (Resolve-Path -LiteralPath $Run).Path
 $Lines = (Resolve-Path -LiteralPath $Lines).Path
@@ -69,7 +70,7 @@ try {
         $itemStates = [System.Collections.Generic.List[object]]::new()
         $measuredItems = [System.Collections.Generic.List[object]]::new()
         foreach ($item in @($line.items)) {
-            $shape = $slide.Shapes.Item([string]$item.shape)
+            $shape = Get-ExactSlideShape $slide ([string]$item.shape)
             if (-not $shape.HasTextFrame -or -not $shape.TextFrame.HasText) {
                 throw "Line item has no text range: $page/$($item.shape)"
             }

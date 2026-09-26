@@ -13,6 +13,7 @@ param(
 
 # Selected, visually reviewed outliers only. All COM work must run serially.
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'native_shape_lookup.ps1')
 $Deck = (Resolve-Path -LiteralPath $Deck).Path
 $Run = (Resolve-Path -LiteralPath $Run).Path
 $Output = [IO.Path]::GetFullPath($Output)
@@ -41,7 +42,7 @@ function Export-Isolated([string]$Phase) {
                 $visible += ,@($shape, $shape.Visible)
                 $shape.Visible = 0
             }
-            $slide.Shapes.Item([string]$target.id).Visible = -1
+            (Get-ExactSlideShape $slide ([string]$target.id)).Visible = -1
             $slide.Export((Join-Path $folder ('formula_{0:D4}.png' -f $index)), 'PNG', [int]$manifest.source.width_px, [int]$manifest.source.height_px)
         } finally {
             foreach ($entry in $visible) { $entry[0].Visible = $entry[1] }
@@ -60,14 +61,14 @@ try {
         if (-not $seen.Add("$($target.page)/$($target.id)")) { throw 'Duplicate refinement target' }
         $slideIndex = [int]$target.page - $FirstPage + 1
         if ($slideIndex -lt 1 -or $slideIndex -gt $presentation.Slides.Count) { throw 'Target page is outside the deck' }
-        $shape = $presentation.Slides.Item($slideIndex).Shapes.Item([string]$target.id)
+        $shape = Get-ExactSlideShape ($presentation.Slides.Item($slideIndex)) ([string]$target.id)
         if (-not $shape.HasTextFrame) { throw 'Selected formula is not a native text/math shape' }
     }
     $before = @(Export-Isolated 'before')
     if (-not $AlignOnly) {
         foreach ($row in $before) {
             if ($row.ratio -lt $MinScale -or $row.ratio -gt $MaxScale) { throw "Implausible scale for $($row.page)/$($row.id): $($row.ratio)" }
-            $range = $presentation.Slides.Item([int]$row.page - $FirstPage + 1).Shapes.Item([string]$row.id).TextFrame2.TextRange
+            $range = (Get-ExactSlideShape ($presentation.Slides.Item([int]$row.page - $FirstPage + 1)) ([string]$row.id)).TextFrame2.TextRange
             $size = [double]$range.Font.Size
             if ($size -le 0) { throw 'Mixed/invalid font sizes require manual review' }
             $newSize = [Math]::Round($size * [double]$row.ratio * 2) / 2
@@ -78,7 +79,7 @@ try {
     $scaled = if ($AlignOnly) { $before } else { @(Export-Isolated 'scaled') }
     foreach ($row in $scaled) {
         if ([Math]::Abs([double]$row.dx_px) -gt $MaxShiftPx -or [Math]::Abs([double]$row.dy_px) -gt $MaxShiftPx) { throw "Large shift needs source review: $($row.page)/$($row.id)" }
-        $shape = $presentation.Slides.Item([int]$row.page - $FirstPage + 1).Shapes.Item([string]$row.id)
+        $shape = Get-ExactSlideShape ($presentation.Slides.Item([int]$row.page - $FirstPage + 1)) ([string]$row.id)
         $pxX = [double]$row.source_size_px[0] / [double]$presentation.PageSetup.SlideWidth
         $pxY = [double]$row.source_size_px[1] / [double]$presentation.PageSetup.SlideHeight
         $shape.Left = [double]$shape.Left + [double]$row.dx_px / $pxX
