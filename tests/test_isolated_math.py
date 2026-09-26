@@ -157,6 +157,13 @@ def test_invalid_filter_fails_in_compare_and_targets_json():
         assert rows[0]["source_ink_filter"] == "achromatic"
         assert rows[0]["source_ink"] == [50, 30, 70, 40]
 
+        clipped = rendered.copy()
+        clipped[0:10, 0:10] = 0
+        Image.fromarray(clipped).save(renders / "formula_0000.png")
+        expect_value_error(lambda: measure(run, renders), "Page 1 formula 'formula_1'")
+        expect_value_error(lambda: measure(run, renders), "formula_0000.png")
+        Image.fromarray(rendered).save(renders / "formula_0000.png")
+
         targets[0]["source_ink_filter"] = "invalid"
         (renders / "targets.json").write_text(
             json.dumps(targets), encoding="utf-8"

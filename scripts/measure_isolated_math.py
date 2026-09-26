@@ -99,15 +99,22 @@ def measure(run, folder):
         geometry = resolve_formula_source_geometry(
             manifest, matches[0], int(target["page"]), source.shape[1::-1]
         )
-        result.append({
-            **target,
-            **compare(
+        try:
+            comparison = compare(
                 source,
                 rendered,
                 geometry.source_box_px,
                 geometry.target_box_px,
                 source_ink_filter=source_ink_filter,
-            ),
+            )
+        except ValueError as exc:
+            raise ValueError(
+                f"Page {target['page']} formula {target['id']!r} "
+                f"(isolated render {folder / f'formula_{index:04}.png'}): {exc}"
+            ) from exc
+        result.append({
+            **target,
+            **comparison,
             "source_box_kind": geometry.source_kind,
             "source_box_evidence": list(geometry.evidence),
         })
