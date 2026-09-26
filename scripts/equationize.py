@@ -236,6 +236,11 @@ def formula_shape(formula, xfrm, shape_id, transform):
             fraction.getparent().replace(fraction, box)
             base.append(fraction)
     fill_empty_nary_bases(omath)
+    if omath.xpath(".//m:m//m:box[m:e/m:f]", namespaces=NS):
+        raise ValueError(
+            f"{formula['id']}: compact fractions inside a matrix are not PowerPoint-safe "
+            "with this converter; use \\frac in the matrix and calibrate separate source blocks"
+        )
     for nary in omath.findall(f".//{tag(M, 'nary')}"):
         props = nary.find(tag(M, "naryPr"))
         if props is None:
@@ -526,6 +531,12 @@ def self_check(mml2omml=None):
         matrix = formula_shape({"id": "matrix-fence", "latex": "G=\\begin{" + environment + r"}g_{11}&g_{12}\\g_{21}&g_{22}\end{" + environment + "}", "box_px": [0, 0, 300, 150]}, xfrm, 2, transform)
         assert len(matrix.xpath(".//m:d/m:e/m:m", namespaces=NS)) == 1, environment
         assert len(matrix.xpath(".//m:m/m:mr", namespaces=NS)) == 2, environment
+    try:
+        formula_shape({"id": "compact-matrix", "latex": r"\begin{vmatrix}\tfrac12&1\\2&3\end{vmatrix}", "box_px": [0, 0, 200, 100]}, xfrm, 2, transform)
+    except ValueError as exc:
+        assert "compact fractions inside a matrix" in str(exc)
+    else:
+        raise AssertionError("unsafe compact matrix fractions must be rejected")
     for latex in (r"\sum_{k=1}^{\infty} u_k(z)", r"\int_C u_k(z)\,dz", r"\sum_0^\infty"):
         sample = formula_shape({"id": "nary-check", "latex": latex, "box_px": [0, 0, 100, 50]}, xfrm, 3, transform)
         assert sample.xpath("count(.//m:nary/m:e[not(*) and not(normalize-space())])", namespaces=NS) == 0
